@@ -1,13 +1,8 @@
 <script lang="ts" setup>
 import { NButton } from 'naive-ui';
-import Browser from 'webextension-polyfill';
-
+import { onMounted, ref } from 'vue';
 console.log("Hello from the popup!");
-function Selection() {
-  Browser.tabs.query({ active: true, currentWindow: true }).then((tabs) => {
-    console.log(tabs);
-  });
-}
+
 </script>
 
 <template>
@@ -17,8 +12,6 @@ function Selection() {
     <p>
       Template: <code>vue-ts</code>
     </p>
-    <NButton type="primary" @click="Selection">Primary Button</NButton>
-    <div class="bg-red"> aihdiuwgadiw</div>
   </div>
 </template>
 
