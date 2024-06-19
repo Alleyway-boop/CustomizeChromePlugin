@@ -33,7 +33,9 @@
   ],
   "permissions": [
     "tabs",
-    "activeTab"
+    "activeTab",
+    "storage",
+    "contextMenus"
   ],
   "options_ui": {
     "page": "src/options.html",

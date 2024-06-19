@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import webExtension, { readJsonFile } from "vite-plugin-web-extension";
 import UnoCSS from 'unocss/vite';
-
 function generateManifest() {
   const manifest = readJsonFile("src/manifest.json");
   const pkg = readJsonFile("package.json");
@@ -22,6 +21,8 @@ export default defineConfig({
       manifest: generateManifest,
       watchFilePaths: ["package.json", "manifest.json"],
     }),
-    UnoCSS()
+    UnoCSS({
+      configFile: 'uno.config.ts',
+    }),
   ],
 });

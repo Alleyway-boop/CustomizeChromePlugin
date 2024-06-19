@@ -7,10 +7,22 @@ interface Message {
   greeting?: string;
   async?: boolean;
   getTabId?: boolean;
-  tabId?: number;
   UpDateLastUseTime?: boolean;
+  getTabActive?: boolean;
+  GetTabStatusList?: boolean;
 }
-
+const FreezeTimeout = ref();
+browser.storage.local.get('FreezeTimeout').then((res) => {
+  if (res.FreezeTimeout) {
+    FreezeTimeout.value = res.FreezeTimeout;
+  }
+});
+const FreezePinned = ref(false);
+browser.storage.local.get('FreezePinned').then((res) => {
+  if (res.FreezePinned) {
+    FreezePinned.value = res.FreezePinned;
+  }
+});
 // 一个列表用于存储所有的 tabId 与其当前的url
 interface TabStatus {
   tabId: number;
@@ -21,17 +33,30 @@ interface TabStatus {
 }
 const tabStatusList: TabStatus[] = [];
 interface Response {
-  response: string;
+  response: string | TabStatus[];
   tabId?: number;
 }
 
 type SendResponse = (response?: Response) => void;
-
+browser.runtime.onInstalled.addListener(() => {
+  browser.contextMenus.create({
+    id: 'sampleContextMenu',
+    title: '冻结此页面',
+    contexts: ['page'],
+    documentUrlPatterns: ['http://*/*', 'https://*/*']
+  })
+})
+browser.contextMenus.onClicked.addListener((info, tab) => {
+  FreezeTab(tab?.id!)
+})
 browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: SendResponse) => {
-  console.log('Received message from content script:', request, sender);
   if (request.getTabId) {
     if (sender.tab && sender.tab.id !== undefined) {
       sendResponse({ response: 'Tab ID fetched', tabId: sender.tab.id });
+      // 查看当前tab是否是固定的tab
+      browser.tabs.query({ pinned: true }).then((tabs) => {
+        console.log('pinned tabs:', tabs);
+      });
       SavePageList(sender);
     } else {
       sendResponse({ response: 'Failed to get Tab ID' });
@@ -42,9 +67,9 @@ browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: S
     if (sender.tab && sender.tab.id !== undefined) {
       const tabId = sender.tab.id;
       const tabStatus = tabStatusList.find((item) => item.tabId === tabId);
+      console.log('tabStatus update TIme :', tabStatus);
       if (tabStatus) {
         tabStatus.lastUseTime = Date.now();
-        console.log('tabStatusList:', tabStatusList);
         sendResponse({ response: 'Update last use time' });
       } else {
         sendResponse({ response: 'Tab not found' });
@@ -52,6 +77,18 @@ browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: S
     } else {
       sendResponse({ response: 'Failed to get Tab ID' });
     }
+    return true;
+  }
+  if (request.getTabActive) {
+    if (sender.tab && sender.tab.active) {
+      sendResponse({ response: 'Tab is active' });
+    } else {
+      sendResponse({ response: 'Tab is not active' });
+    }
+    return true;
+  }
+  if (request.GetTabStatusList) {
+    sendResponse({ response: tabStatusList });
     return true;
   }
   if (request.async) {
@@ -68,13 +105,18 @@ browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: S
 // 获取当前 tabId 并保存到 tabStatusList
 function SavePageList(sender: Runtime.MessageSender) {
   if (sender.tab && sender.tab.id !== undefined) {
-    tabStatusList.push({
-      tabId: sender.tab.id,
-      url: sender.tab.url || '',
-      icon: sender.tab.favIconUrl || '',
-      title: sender.tab.title || '',
-      lastUseTime: Date.now(),
-    });
+    const tabStatus = tabStatusList.find((item) => item.tabId === sender.tab?.id);
+    if (tabStatus) {
+      tabStatus.lastUseTime = Date.now();
+    } else {
+      tabStatusList.push({
+        tabId: sender.tab.id,
+        url: sender.tab.url || '',
+        icon: sender.tab.favIconUrl || '',
+        title: sender.tab.title || '',
+        lastUseTime: Date.now(),
+      });
+    }
     console.log('tabStatusList:', tabStatusList);
   }
 }
@@ -97,20 +139,41 @@ browser.runtime.onInstalled.addListener(() => {
     }
   });
 });
-
+function FreezeTab(tabId: number) {
+  browser.tabs.get(tabId).then((tab) => {
+    // 修改当前tab的url
+    browser.tabs.update(tabId, { url: browser.runtime.getURL('src/options.html') + `?title=${tab.title}&url=${tab.url}&icon=${tab.favIconUrl}` });
+    // 移除 tabStatusList 中的该项
+    const index = tabStatusList.findIndex((tab) => tab.tabId === tabId);
+    if (index !== -1) {
+      tabStatusList.splice(index, 1);
+    }
+  });
+}
 setInterval(() => {
   // 每20秒检查一次所有的 tabStatusList，如果有超过 5 分钟未使用的 tab，则发送消息到 content script
+  browser.storage.local.get('FreezeTimeout').then((res) => {
+    if (res.FreezeTimeout) {
+      FreezeTimeout.value = res.FreezeTimeout;
+    }
+  });
+  console.log('FreezeTimeout:', FreezeTimeout.value);
   const now = Date.now();
   tabStatusList.forEach((item) => {
-    if (now - item.lastUseTime > 1000 * 10) {
-      sendMessageToContentScript(item.tabId, { greeting: 'Hello from background 再不更新时间可就把你放小黑屋了' });
-      // 修改当前tab的url
-      browser.tabs.update(item.tabId, { url: browser.runtime.getURL('src/options.html') + `?title=${item.title}&url=${item.url}&icon=${item.icon}` });
-      // 移除 tabStatusList 中的该项
-      const index = tabStatusList.findIndex((tab) => tab.tabId === item.tabId);
-      if (index !== -1) {
-        tabStatusList.splice(index, 1);
-      }
+    if (now - item.lastUseTime > 1000 * 60 * FreezeTimeout.value) {
+      browser.tabs.get(item.tabId).then((tab) => {
+        if (tab.pinned && !FreezePinned.value) {
+          return;
+        }
+        sendMessageToContentScript(item.tabId, { greeting: 'Hello from background 再不更新时间可就把你放小黑屋了' });
+        // 修改当前tab的url
+        browser.tabs.update(item.tabId, { url: browser.runtime.getURL('src/options.html') + `?title=${item.title}&url=${item.url}&icon=${item.icon}` });
+        // 移除 tabStatusList 中的该项
+        const index = tabStatusList.findIndex((tab) => tab.tabId === item.tabId);
+        if (index !== -1) {
+          tabStatusList.splice(index, 1);
+        }
+      });
     }
   });
 }
