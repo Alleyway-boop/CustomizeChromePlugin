@@ -5,24 +5,25 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build"
+    "build": "vue-tsc && vite build && .\\script\\replaceParallel.exe -d dist -s '__uno' -r 'uno' -a",
+    "Debug": "vite build --debug",
+    "replace": ".\\script\\replaceParallel.exe -d dist -s '__uno' -r 'uno' -a"
   },
   "dependencies": {
-    "vue": "^3.3",
-    "pinia": "^2.1.7",
-    "pinia-plugin-persistedstate": "^3.2.1"
+    "vue": "^3.3"
   },
   "devDependencies": {
     "@types/webextension-polyfill": "^0.10.0",
+    "@unocss/transformer-directives": "^0.61.0",
     "@vitejs/plugin-vue": "^5.0.5",
+    "@vueuse/core": "^10.3.0",
+    "naive-ui": "^2.38.2",
+    "rollup-plugin-replace": "^2.2.0",
     "typescript": "^5.3.2",
+    "unocss": "^0.61.0",
     "vite": "^5.0.0",
     "vite-plugin-web-extension": "^4.0.0",
     "vue-tsc": "^2.0.21",
-    "webextension-polyfill": "^0.12.0",
-    "unocss": "^0.61.0",
-    "naive-ui": "^2.38.2",
-    "@unocss/transformer-directives": "^0.61.0",
-    "@vueuse/core": "^10.3.0"
+    "webextension-polyfill": "^0.12.0"
   }
 }

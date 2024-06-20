@@ -1,8 +1,12 @@
 <script lang="ts" setup>
-import { NDataTable, NInputNumber, NSwitch } from 'naive-ui';
+import { NDataTable, NInputNumber, NSwitch, NTooltip } from 'naive-ui';
 import { onMounted, ref, watch } from 'vue';
 import browser from 'webextension-polyfill';
 import { useDebounceFn } from '@vueuse/core'
+import { darkTheme } from 'naive-ui'
+import type { GlobalTheme } from 'naive-ui'
+const theme = ref<GlobalTheme>(darkTheme)
+
 console.log("Hello from the popup!");
 browser.runtime.sendMessage({ GetTabStatusList: true }).then((response) => {
   console.log('GetTabStatusList:', response);
@@ -95,6 +99,7 @@ setInterval(() => {
     TabStatusList.value = response.response;
   });
 }, 1000);
+
 </script>
 
 <template class="w-300px h-400px p-0 m-0">
@@ -117,11 +122,16 @@ setInterval(() => {
     <!-- 显示当前被插件管理的页面 -->
     <div class="flex flex-col gap-8px w-full" v-for="(item, index) in TabStatusList">
       <div class="flex justify-between items-center m-l m-r m-b-0">
-        <div class="flex gap-8px items-center border-b-solid b-1px w-full h-30px">
-          <p class="m-l-10px">{{ index + 1+'.'}}</p>
-          <img :src="item.icon" class="w-16px h-16px" />
-          <p class="overflow-hidden text-ellipsis whitespace-nowrap w-200px">{{ item.title }}</p>
-        </div>
+        <NTooltip>
+          <template #trigger>
+            <div class="flex gap-8px items-center border-b-solid b-1px w-full h-30px">
+              <p class="m-l-10px">{{ index + 1 + '.' }}</p>
+              <img :src="item.icon" class="w-16px h-16px" />
+              <p class="overflow-hidden text-ellipsis whitespace-nowrap w-200px">{{ item.title }}</p>
+            </div>
+          </template>
+          <div> {{ new Date(item.lastUseTime).toLocaleString() }}</div>
+        </NTooltip>
       </div>
     </div>
   </div>

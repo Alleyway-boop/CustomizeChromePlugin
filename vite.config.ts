@@ -17,12 +17,13 @@ function generateManifest() {
 export default defineConfig({
   plugins: [
     vue(),
+    UnoCSS(),
     webExtension({
       manifest: generateManifest,
       watchFilePaths: ["package.json", "manifest.json"],
     }),
-    UnoCSS({
-      configFile: 'uno.config.ts',
-    }),
   ],
+  build: {
+    sourcemap: false
+  }
 });

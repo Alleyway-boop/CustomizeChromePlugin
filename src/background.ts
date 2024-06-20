@@ -10,15 +10,16 @@ interface Message {
   UpDateLastUseTime?: boolean;
   getTabActive?: boolean;
   GetTabStatusList?: boolean;
+  DeleteTab?: boolean;
 }
 const FreezeTimeout = ref();
-browser.storage.local.get('FreezeTimeout').then((res) => {
+browser.storage.sync.get('FreezeTimeout').then((res) => {
   if (res.FreezeTimeout) {
     FreezeTimeout.value = res.FreezeTimeout;
   }
 });
 const FreezePinned = ref(false);
-browser.storage.local.get('FreezePinned').then((res) => {
+browser.storage.sync.get('FreezePinned').then((res) => {
   if (res.FreezePinned) {
     FreezePinned.value = res.FreezePinned;
   }
@@ -33,7 +34,7 @@ interface TabStatus {
 }
 const tabStatusList: TabStatus[] = [];
 interface Response {
-  response: string | TabStatus[];
+  response: string | TabStatus[] | boolean | number | undefined;
   tabId?: number;
 }
 
@@ -81,14 +82,20 @@ browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: S
   }
   if (request.getTabActive) {
     if (sender.tab && sender.tab.active) {
-      sendResponse({ response: 'Tab is active' });
+      sendResponse({ response: true });
     } else {
-      sendResponse({ response: 'Tab is not active' });
+      sendResponse({ response: false });
     }
     return true;
   }
   if (request.GetTabStatusList) {
     sendResponse({ response: tabStatusList });
+    return true;
+  }
+  if (request.DeleteTab) {
+    if (sender.tab && sender.tab.id !== undefined) {
+      deleteTab(sender.tab.id);
+    }
     return true;
   }
   if (request.async) {
@@ -120,7 +127,12 @@ function SavePageList(sender: Runtime.MessageSender) {
     console.log('tabStatusList:', tabStatusList);
   }
 }
-
+function deleteTab(tabId: number) {
+  const index = tabStatusList.findIndex((tab) => tab.tabId === tabId);
+  if (index !== -1) {
+    tabStatusList.splice(index, 1);
+  }
+}
 // 发送消息到特定的 content script
 function sendMessageToContentScript(tabId: number, message: object) {
   browser.tabs.sendMessage(tabId, message).then((response) => {
@@ -152,12 +164,11 @@ function FreezeTab(tabId: number) {
 }
 setInterval(() => {
   // 每20秒检查一次所有的 tabStatusList，如果有超过 5 分钟未使用的 tab，则发送消息到 content script
-  browser.storage.local.get('FreezeTimeout').then((res) => {
+  browser.storage.sync.get('FreezeTimeout').then((res) => {
     if (res.FreezeTimeout) {
       FreezeTimeout.value = res.FreezeTimeout;
     }
   });
-  console.log('FreezeTimeout:', FreezeTimeout.value);
   const now = Date.now();
   tabStatusList.forEach((item) => {
     if (now - item.lastUseTime > 1000 * 60 * FreezeTimeout.value) {
@@ -177,4 +188,4 @@ setInterval(() => {
     }
   });
 }
-  , 1000 * 20);
+  , 1000 * 5);

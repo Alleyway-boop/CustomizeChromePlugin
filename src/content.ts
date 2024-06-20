@@ -14,6 +14,10 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse: SendRespon
 
 setInterval(() => {
     browser.runtime.sendMessage({ getTabActive: true }).then((tabActive) => {
-        if (tabActive) browser.runtime.sendMessage({ UpDateLastUseTime: true });
+        if (tabActive.response) browser.runtime.sendMessage({ UpDateLastUseTime: true });
     });
 }, 1000 * 30); // 每30s更新一次 lastUseTime
+// 如果当前页面即将被关闭，通知 background script 删除当前 tab
+window.addEventListener('beforeunload', () => {
+    browser.runtime.sendMessage({ DeleteTab: true });
+});

@@ -1,5 +1,5 @@
 import Popup from "./pages/Popup.vue";
-import { createApp } from "vue";
 import 'virtual:uno.css'
+import { createApp } from "vue";
 const app = createApp(Popup)
 app.mount("body");

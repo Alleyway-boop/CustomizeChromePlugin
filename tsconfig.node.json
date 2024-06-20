@@ -6,7 +6,6 @@
     "allowSyntheticDefaultImports": true
   },
   "include": [
-    "vite.config.ts",
-    "src/plugins/vite-plugin-Rename.ts"
+    "vite.config.ts"
 ]
 }
