@@ -55,9 +55,6 @@ browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: S
     if (sender.tab && sender.tab.id !== undefined) {
       sendResponse({ response: 'Tab ID fetched', tabId: sender.tab.id });
       // 查看当前tab是否是固定的tab
-      browser.tabs.query({ pinned: true }).then((tabs) => {
-        console.log('pinned tabs:', tabs);
-      });
       SavePageList(sender);
     } else {
       sendResponse({ response: 'Failed to get Tab ID' });
@@ -127,6 +124,16 @@ function SavePageList(sender: Runtime.MessageSender) {
     console.log('tabStatusList:', tabStatusList);
   }
 }
+// 定时轮询没有获取到icon的tab
+setInterval(() => {
+  tabStatusList.forEach((item) => {
+    if (item.icon.length === 0 && item.tabId !== undefined) {
+      browser.tabs.get(item.tabId).then((tab) => {
+        item.icon = tab.favIconUrl || '';
+      });
+    }
+  });
+}, 1000 * 5);
 function deleteTab(tabId: number) {
   const index = tabStatusList.findIndex((tab) => tab.tabId === tabId);
   if (index !== -1) {

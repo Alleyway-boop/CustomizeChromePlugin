@@ -42,7 +42,7 @@ function BackSource() {
 </script>
 
 <template>
-    <div class="container" @click="BackSource">
+    <div class="flex justify-center items-center text-center" @click="BackSource">
         <div>
             <img src="/icon-with-shadow.svg" alt="Icon" />
             <h1>{{ title || 'vite-plugin-web-extension' }}</h1>
@@ -54,22 +54,4 @@ function BackSource() {
 </template>
 
 <style scoped>
-.container {
-    display: -webkit-box;
-    display: -ms-flexbox;
-    display: -webkit-flex;
-    display: flex;
-    -webkit-box-pack: center;
-    -ms-flex-pack: center;
-    -webkit-justify-content: center;
-    justify-content: center;
-    -webkit-box-align: center;
-    -ms-flex-align: center;
-    -webkit-align-items: center;
-    align-items: center;
-    -ms-flex-line-pack: center;
-    -webkit-align-content: center;
-    align-content: center;
-    text-align: center;
-}
 </style>
