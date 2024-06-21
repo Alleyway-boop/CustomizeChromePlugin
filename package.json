@@ -1,13 +1,13 @@
 {
-  "name": "CustomizeChromePlugin",
+  "name": "customize_chrome_plugin",
   "private": true,
   "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build && .\\script\\replaceParallel.exe -d dist -s '__uno' -r 'uno' -c -n",
+    "build": "vue-tsc && vite build && node .\\script\\CallReplaceScript.cjs",
     "Debug": "vite build --debug",
-    "replace": ".\\script\\replaceParallel.exe -d dist -s '__uno' -r 'uno' -a"
+    "replace": "node .\\script\\CallReplaceScript.cjs"
   },
   "dependencies": {
     "vue": "^3.3"
