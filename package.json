@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build && .\\script\\replaceParallel.exe -d dist -s '__uno' -r 'uno' -a",
+    "build": "vue-tsc && vite build && .\\script\\replaceParallel.exe -d dist -s '__uno' -r 'uno' -c -n",
     "Debug": "vite build --debug",
     "replace": ".\\script\\replaceParallel.exe -d dist -s '__uno' -r 'uno' -a"
   },

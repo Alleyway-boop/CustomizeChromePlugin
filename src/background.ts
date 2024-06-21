@@ -1,17 +1,9 @@
 import { Status } from 'naive-ui/es/progress/src/interface';
-import { ref, toRef } from 'vue';
+import { ref, toRef, watch } from 'vue';
 import Browser, { Runtime } from 'webextension-polyfill';
 import browser from 'webextension-polyfill';
+import { Message, SendResponse } from './utils';
 
-interface Message {
-  greeting?: string;
-  async?: boolean;
-  getTabId?: boolean;
-  UpDateLastUseTime?: boolean;
-  getTabActive?: boolean;
-  GetTabStatusList?: boolean;
-  DeleteTab?: boolean;
-}
 const FreezeTimeout = ref();
 browser.storage.sync.get('FreezeTimeout').then((res) => {
   if (res.FreezeTimeout) {
@@ -33,12 +25,13 @@ interface TabStatus {
   lastUseTime: number;
 }
 const tabStatusList: TabStatus[] = [];
-interface Response {
-  response: string | TabStatus[] | boolean | number | undefined;
-  tabId?: number;
+interface FreezeTabStatus {
+  tabId: number;
+  url: string;
+  icon: string;
+  title: string;
 }
-
-type SendResponse = (response?: Response) => void;
+const freezeTabStatusList: FreezeTabStatus[] = [];
 browser.runtime.onInstalled.addListener(() => {
   browser.contextMenus.create({
     id: 'sampleContextMenu',
@@ -95,6 +88,14 @@ browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: S
     }
     return true;
   }
+  if (request.GetFreezeTabList) {
+    sendResponse({ response: freezeTabStatusList });
+    return true;
+  }
+  if (request.RecoverFreezeTab) {
+    recoverFreeTab();
+    return true;
+  }
   if (request.async) {
     // 异步处理示例
     setTimeout(() => {
@@ -133,7 +134,7 @@ setInterval(() => {
       });
     }
   });
-}, 1000 * 5);
+}, 1000 * 30);
 function deleteTab(tabId: number) {
   const index = tabStatusList.findIndex((tab) => tab.tabId === tabId);
   if (index !== -1) {
@@ -194,5 +195,52 @@ setInterval(() => {
       });
     }
   });
+  GetAllFreeTab();
 }
   , 1000 * 5);
+function GetAllFreeTab() {
+  // 获取当前浏览器页面所有的冻结页面
+  // 每次获取之前先清空之前的数据
+  freezeTabStatusList.splice(0, freezeTabStatusList.length);
+  browser.tabs.query({}).then((tabs) => {
+    tabs.forEach((tab) => {
+      if (tab.url?.includes('options.html') && freezeTabStatusList.findIndex((item) => item.tabId === tab.id) === -1) {
+        freezeTabStatusList.push({
+          tabId: tab.id!,
+          url: tab.url || '',
+          icon: tab.favIconUrl || '',
+          title: tab.title || '',
+        });
+      }
+    });
+    saveFreeTab();
+  });
+}
+watch(tabStatusList, (newVal) => {
+  GetAllFreeTab();
+});
+
+// 保存冻结的tab，以便下次插件被加载时恢复
+async function saveFreeTab() {
+  await browser.storage.sync.set({ 'freezeTabStatusList': freezeTabStatusList });
+}
+
+async function recoverFreeTab() {
+  let TempFreezeTabStatusList: FreezeTabStatus[] = [];
+  TempFreezeTabStatusList = freezeTabStatusList;
+  await browser.storage.sync.get('freezeTabStatusList').then((res) => {
+    if (res.freezeTabStatusList) {
+      res.freezeTabStatusList.forEach((item: FreezeTabStatus) => {
+        // 跳过已经打开的页面
+        if (tabStatusList.findIndex((tab) => tab.tabId === item.tabId) !== -1) {
+          return;
+        }
+        // 跳过页面上已经存在的冻结页面
+        if (TempFreezeTabStatusList.findIndex((tab) => tab.tabId === item.tabId) !== -1) {
+          return;
+        }
+        browser.tabs.create({ url: item.url });
+      });
+    }
+  });
+}
