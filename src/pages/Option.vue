@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { NButton } from 'naive-ui';
+import { ref, onMounted, watchEffect } from 'vue';
+import { NButton, NIcon, NModal, NModalProvider, NUpload, NUploadDragger, UploadFileInfo } from 'naive-ui';
 import Browser from 'webextension-polyfill';
 
 // 获取当前页面的完整 URL
@@ -39,6 +39,13 @@ function BackSource() {
     window.location.href = url.value;
     console.log('Back to Source:', url.value);
 }
+const showModal = ref(false);
+const previewFileList = ref<UploadFileInfo[]>()
+const previewImageUrl = ref<string>()
+const showPreview = ref(false)
+watchEffect(() => {
+    console.log('previewFileList:', previewFileList.value)
+})
 </script>
 
 <template>
@@ -49,9 +56,26 @@ function BackSource() {
             <p>
                 Template: <code>vue-ts</code>
             </p>
+            <NButton class="" @click.stop="showModal = !showModal">上传自定义背景</NButton>
         </div>
+        <NModal v-model:show="showModal" class="max-w-30%">
+            <NUpload :max="1" :default-file-list="previewFileList" list-type="image" file-list-class="bg-white">
+                <NUploadDragger>
+                    <div style="margin-bottom: 12px">
+                        <NIcon size="48" :depth="3">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+                                <path fill="#888888"
+                                    d="M4 22v-2h16v2zm5-4v-7H5l7-9l7 9h-4v7zm2-2h2V9h1.9L12 5.25L9.1 9H11zm1-7"></path>
+                            </svg>
+                        </NIcon>
+                    </div>
+                    <n-text style="font-size: 16px">
+                        点击或者拖动文件到该区域来上传
+                    </n-text>
+                </NUploadDragger>
+            </NUpload>
+        </NModal>
     </div>
 </template>
 
-<style scoped>
-</style>
+<style></style>
