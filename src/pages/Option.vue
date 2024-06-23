@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watchEffect } from 'vue';
-import { NButton, NIcon, NModal, NModalProvider, NUpload, NUploadDragger, UploadFileInfo } from 'naive-ui';
-import Browser from 'webextension-polyfill';
+import { NButton, NIcon, NImage, NModal, NModalProvider, NUpload, NUploadDragger, UploadFileInfo, UploadSettledFileInfo } from 'naive-ui';
+import browser from 'webextension-polyfill';
 
 // 获取当前页面的完整 URL
 const FullPath = window.location.href;
@@ -16,7 +16,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const title = ref<string>(urlParams.get('title')!);
 const url = ref<string>(urlParams.get('url')!);
 const icon = ref<string>(urlParams.get('icon')!);
-
+const background = ref<string>();
 // 设置当前页面的标题和图标
 onMounted(() => {
     if (title.value) {
@@ -46,10 +46,37 @@ const showPreview = ref(false)
 watchEffect(() => {
     console.log('previewFileList:', previewFileList.value)
 })
+function handleFinish({ file, event }: {
+    file: UploadSettledFileInfo;
+    event?: ProgressEvent;
+}) {
+    SaveBackgroundImage(file);
+}
+function SaveBackgroundImage(file: UploadSettledFileInfo) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+        const base64 = e.target?.result
+        browser.storage.local.set({ "backgroundImage": base64 })
+        background.value = base64 as string
+        document.body.style.backgroundImage = `url(${background.value})`
+        document.body.style.backgroundSize = 'cover'
+        showModal.value = false
+    }
+    reader.readAsDataURL(file.file!)
+}
+onMounted(() => {
+    browser.storage.local.get('backgroundImage').then((result) => {
+        if (result.backgroundImage) {
+            background.value = result.backgroundImage
+            document.body.style.backgroundImage = `url(${background.value})`
+            document.body.style.backgroundSize = 'cover'
+        }
+    })
+})
 </script>
 
 <template>
-    <div class="flex justify-center items-center text-center" @click="BackSource">
+    <div class="flex justify-center items-center text-center font-bold text-white" @click="BackSource">
         <div>
             <img src="/icon-with-shadow.svg" alt="Icon" />
             <h1>{{ title || 'vite-plugin-web-extension' }}</h1>
@@ -59,7 +86,8 @@ watchEffect(() => {
             <NButton class="" @click.stop="showModal = !showModal">上传自定义背景</NButton>
         </div>
         <NModal v-model:show="showModal" class="max-w-30%">
-            <NUpload :max="1" :default-file-list="previewFileList" list-type="image" file-list-class="bg-white">
+            <NUpload :max="1" :default-file-list="previewFileList" list-type="image" file-list-class="bg-white"
+                action="" @finish="handleFinish">
                 <NUploadDragger>
                     <div style="margin-bottom: 12px">
                         <NIcon size="48" :depth="3">
@@ -78,4 +106,11 @@ watchEffect(() => {
     </div>
 </template>
 
-<style></style>
+<style>
+* {
+    user-select: none;
+}
+h1, p {
+    mix-blend-mode: difference;
+}
+</style>
