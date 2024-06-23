@@ -11,7 +11,7 @@
 - **内存使用监控**：跟踪浏览器的内存使用情况，识别性能提升效果。
 
 ## 安装
-1. 从[插件库](#)或[官网](#)下载插件。
+1. 从[插件库](https://github.com/Alleyway-boop/CustomizeChromePlugin)下载插件。
 2. 打开浏览器并导航到扩展程序/附加组件页面。
 3. 点击“加载已解压的扩展程序”或“从文件安装”，选择下载的插件文件。
 4. 安装完成后，浏览器工具栏将显示浏览器标签管理插件图标。
@@ -50,18 +50,10 @@
 4. 向主仓库提交 pull request。
 
 ## 支持
-如需支持和故障排除，请访问我们的[支持页面](#)或联系我们：support@example.com。
+如需支持和故障排除，请访问我们的[支持页面](https://github.com/Alleyway-boop/CustomizeChromePlugin)或联系我们：yuanfangwa@gmail.com。
 
 ## 许可证
-本项目使用 MIT 许可证。详情请参阅 [LICENSE](LICENSE) 文件。
+本项目使用 MIT 许可证。详情请参阅 [LICENSE](https://github.com/Alleyway-boop/CustomizeChromePlugin/blob/master/LICENSE) 文件。
 
 ## 致谢
 感谢所有贡献者和用户的支持和反馈。
-
----
-
-使用浏览器标签管理插件即表示你同意[隐私政策](#)和[服务条款](#)中列出的条款和条件。
-
----
-
-*注：请将 `[#]` 和 `example.com` 等占位符替换为实际链接和联系信息。*

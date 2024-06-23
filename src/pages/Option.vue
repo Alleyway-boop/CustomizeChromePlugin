@@ -78,7 +78,7 @@ onMounted(() => {
 <template>
     <div class="flex justify-center items-center text-center font-bold text-white" @click="BackSource">
         <div>
-            <img src="/icon-with-shadow.svg" alt="Icon" />
+            <img src="/icon-with-shadow.svg" alt="Icon"  class="max-h-30vh"/>
             <h1>{{ title || 'vite-plugin-web-extension' }}</h1>
             <p>
                 Template: <code>vue-ts</code>

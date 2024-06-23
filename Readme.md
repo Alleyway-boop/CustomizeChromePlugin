@@ -11,7 +11,7 @@ The Browser Tab Manager Plugin is a tool designed to help users manage their bro
 - **Memory Usage Monitoring**: Track the memory usage of your browser to identify performance improvements.
 
 ## Installation
-1. Download the plugin from the [plugin repository](#) or the [official website](#).
+1. Download the plugin from the [plugin repository ](https://github.com/Alleyway-boop/CustomizeChromePlugin).
 2. Open your browser and navigate to the extensions/add-ons page.
 3. Click on "Load unpacked" or "Install from file" and select the downloaded plugin file.
 4. The Browser Tab Manager Plugin icon will appear in your browser toolbar once installed.
@@ -50,18 +50,10 @@ We welcome contributions to improve the Browser Tab Manager Plugin. To contribut
 4. Submit a pull request to the main repository.
 
 ## Support
-For support and troubleshooting, visit our [support page](#) or contact us at support@example.com.
+For support and troubleshooting, visit our [support page](https://github.com/Alleyway-boop/CustomizeChromePlugin) or contact us at yuanfangwa@gmail.com.
 
 ## License
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/Alleyway-boop/CustomizeChromePlugin/blob/master/LICENSE) file for more details.
 
 ## Acknowledgements
 We would like to thank all contributors and users for their support and feedback.
-
----
-
-By using the Browser Tab Manager Plugin, you agree to the terms and conditions outlined in the [privacy policy](#) and [terms of service](#).
-
----
-
-*Note: Replace placeholders like `[#]` and `example.com` with actual links and contact details.*
