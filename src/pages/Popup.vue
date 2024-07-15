@@ -129,8 +129,8 @@ function RecoverAllTab() {
 </script>
 
 <template class="w-300px h-400px p-0 m-0">
-  <NLayout>
-    <div class="h-full flex flex-col gap-16px items-center">
+  <NLayout class="select-none">
+    <div class="h-full flex flex-col gap-16px items-center mt-3">
       <img src="/icon-with-shadow.svg" class=" w-50px h-50px" />
       <h1 class="text-18px font-bold m-0">YuanFang</h1>
       <div class="flex justify-between content-center items-center  m-10px">

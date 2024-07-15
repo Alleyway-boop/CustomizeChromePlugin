@@ -79,7 +79,7 @@ onMounted(() => {
 <template>
     <div class="flex justify-center items-center text-center font-bold text-white" @click="BackSource">
         <div>
-            <img src="/icon-with-shadow.svg" alt="Icon"  class="max-h-30vh"/>
+            <img src="/icon-with-shadow.svg" alt="Icon" class="max-h-30vh" />
             <h1>{{ title || 'vite-plugin-web-extension' }}</h1>
             <p>
                 Template: <code>vue-ts</code>
@@ -111,7 +111,9 @@ onMounted(() => {
 * {
     user-select: none;
 }
-h1, p {
+
+h1,
+p {
     mix-blend-mode: difference;
 }
 </style>
