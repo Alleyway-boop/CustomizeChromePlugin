@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { NCollapse, NCollapseItem, NDataTable, NInputNumber, NSwitch, NTooltip, NIcon, NScrollbar } from 'naive-ui';
+import { NCollapse, NCollapseItem, NDataTable, NInputNumber, NSwitch, NTooltip, NIcon, NScrollbar, NLayout } from 'naive-ui';
 import { onMounted, ref, watch } from 'vue';
 import browser from 'webextension-polyfill';
 import { useDebounceFn } from '@vueuse/core'
