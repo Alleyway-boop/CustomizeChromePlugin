@@ -15,7 +15,7 @@ console.log('Path:', Path);
 const urlParams = new URLSearchParams(window.location.search);
 console.log('URL Params:', urlParams);
 const title = ref<string>(urlParams.get('title')!);
-const url = ref<string>(urlParams.get('url')!);
+const url = ref<string>(urlParams.get('url') != undefined ? decodeURIComponent(urlParams.get('url')!) : '');
 const icon = ref<string>(urlParams.get('icon')!);
 const background = ref<string>();
 // 设置当前页面的标题和图标

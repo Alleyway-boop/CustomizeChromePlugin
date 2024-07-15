@@ -162,7 +162,8 @@ browser.runtime.onInstalled.addListener(() => {
 function FreezeTab(tabId: number) {
   browser.tabs.get(tabId).then((tab) => {
     // 修改当前tab的url
-    browser.tabs.update(tabId, { url: browser.runtime.getURL('src/options.html') + `?title=${tab.title}&url=${tab.url}&icon=${tab.favIconUrl}` });
+    console.log('tabxxx:', tab);
+    browser.tabs.update(tabId, { url: browser.runtime.getURL('src/options.html') + `?title=${tab.title}&url=${tab.url != undefined ? encodeURIComponent(tab.url) : tab.url}&icon=${tab.favIconUrl}` });
     // 移除 tabStatusList 中的该项
     const index = tabStatusList.findIndex((tab) => tab.tabId === tabId);
     if (index !== -1) {
