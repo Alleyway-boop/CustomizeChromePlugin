@@ -150,7 +150,7 @@ function RecoverAllTab() {
       <NScrollbar trigger="none">
         <NCollapse :accordion="true" class="w-[calc(100%-8px)]">
           <NCollapseItem title="当前活跃页面">
-            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in TabStatusList">
+            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in TabStatusList" :key="index">
               <div class="flex justify-between items-center m-l m-r">
                 <NTooltip>
                   <template #trigger>
@@ -181,7 +181,7 @@ function RecoverAllTab() {
             </template>
           </NCollapseItem>
           <NCollapseItem title="已冻结Tab">
-            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in freezeTabStatusList">
+            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in freezeTabStatusList" :key="index">
               <div class="flex justify-between items-center m-l m-r m-b-0">
                 <div class="flex gap-8px items-center border-b-solid b-1px w-full h-30px">
                   <p class="m-l-10px">{{ index + 1 + '.' }}</p>

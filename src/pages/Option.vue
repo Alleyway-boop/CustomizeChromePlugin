@@ -13,6 +13,7 @@ console.log('Path:', Path);
 
 // 解析 URL 参数
 const urlParams = new URLSearchParams(window.location.search);
+console.log('URL Params:', urlParams);
 const title = ref<string>(urlParams.get('title')!);
 const url = ref<string>(urlParams.get('url')!);
 const icon = ref<string>(urlParams.get('icon')!);
