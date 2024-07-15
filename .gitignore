@@ -25,3 +25,4 @@ dist
 # Config files
 .webextrc
 .webextrc.*
+freezeTab
