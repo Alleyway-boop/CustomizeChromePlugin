@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watchEffect } from 'vue';
-import { NButton, NIcon, NImage, NModal, NModalProvider, NUpload, NUploadDragger, UploadFileInfo, UploadSettledFileInfo } from 'naive-ui';
+import { NButton, NIcon, NModal, NUpload, NUploadDragger, UploadFileInfo, UploadSettledFileInfo } from 'naive-ui';
 import browser from 'webextension-polyfill';
 
 // 获取当前页面的完整 URL
