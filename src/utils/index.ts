@@ -1,5 +1,3 @@
-import Browser from "webextension-polyfill";
-
 interface Message {
     greeting?: string;
     async?: boolean;
