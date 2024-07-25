@@ -10,17 +10,18 @@
     "replace": "node .\\script\\CallReplaceScript.cjs"
   },
   "dependencies": {
-    "vue": "^3.4.30",
     "@iconify-json/carbon": "^1.1.36",
     "@iconify-json/cib": "^1.1.8",
-    "@iconify-json/mingcute": "^1.1.18"
+    "@iconify-json/mingcute": "^1.1.18",
+    "@vueuse/motion": "^2.2.3",
+    "vue": "^3.4.30"
   },
   "devDependencies": {
-    "@types/webextension-polyfill": "^0.10.0",
-    "@unocss/transformer-directives": "^0.61.0",
     "@iconify-json/fluent": "^1.1.57",
     "@iconify-json/ion": "^1.1.18",
     "@iconify-json/ri": "^1.1.21",
+    "@types/webextension-polyfill": "^0.10.0",
+    "@unocss/transformer-directives": "^0.61.0",
     "@vitejs/plugin-vue": "^5.0.5",
     "@vueuse/core": "^10.11.0",
     "naive-ui": "^2.38.2",
