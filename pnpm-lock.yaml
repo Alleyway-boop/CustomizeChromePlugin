@@ -20,6 +20,9 @@ importers:
       '@vueuse/motion':
         specifier: ^2.2.3
         version: 2.2.3(rollup@4.18.0)(vue@3.4.30(typescript@5.4.5))
+      alova:
+        specifier: ^3.0.2
+        version: 3.0.2
       vue:
         specifier: ^3.4.30
         version: 3.4.30(typescript@5.4.5)
@@ -68,6 +71,9 @@ importers:
         version: 0.12.0
 
 packages:
+
+  '@alova/shared@1.0.2':
+    resolution: {integrity: sha512-Kuf/2I/RxOc6RdgZlGj38fncOgTq7X7+KaYOxpZjjLuwuDh5XErulrXGZI7EX1key07CCuFCUlDUvmasXzBwNQ==}
 
   '@ampproject/remapping@2.3.0':
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
@@ -786,6 +792,10 @@ packages:
 
   ajv@8.16.0:
     resolution: {integrity: sha512-F0twR8U1ZU67JIEtekUcLkXkoO5mMMmgGD8sK/xUFzJ805jxHQl92hImFAqqXMyMYjSPOyUPAwHYhB72g5sTXw==}
+
+  alova@3.0.2:
+    resolution: {integrity: sha512-nPPJMcasU24kdWwQrUzEBWVQ0RC09+cIL9uNpB/KM0gUzk2exsJXw/UX+0MYegZWTSSeWDxPT3G+LsJ8UwzQ1w==}
+    engines: {node: '>= 18.0.0'}
 
   ansi-align@3.0.1:
     resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
@@ -1820,6 +1830,9 @@ packages:
     resolution: {integrity: sha512-WuyALRjWPDGtt/wzJiadO5AXY+8hZ80hVpe6MyivgraREW751X3SbhRvG3eLKOYN+8VEvqLcf3wdnt44Z4S4SA==}
     engines: {node: '>=10'}
 
+  rate-limiter-flexible@5.0.3:
+    resolution: {integrity: sha512-lWx2y8NBVlTOLPyqs+6y7dxfEpT6YFqKy3MzWbCy95sTTOhOuxufP2QvRyOHpfXpB9OUJPbVLybw3z3AVAS5fA==}
+
   rc9@2.1.2:
     resolution: {integrity: sha512-btXCnMmRIBINM2LDZoEmOogIZU7Qe7zn4BpomSKZ/ykbLObuBdvG+mFq11DL6fjH1DRwHhrlgtYWG96bJiC7Cg==}
 
@@ -2322,6 +2335,8 @@ packages:
     resolution: {integrity: sha512-uhlsJZWz26FLYXOD6WVuq+fIcZ3aBPGo/cFdiLlv3KNwpa52IF3ISV8fLhQLiqVu5No3VhlqlgthN6gehil1Dg==}
 
 snapshots:
+
+  '@alova/shared@1.0.2': {}
 
   '@ampproject/remapping@2.3.0':
     dependencies:
@@ -3176,6 +3191,11 @@ snapshots:
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
       uri-js: 4.4.1
+
+  alova@3.0.2:
+    dependencies:
+      '@alova/shared': 1.0.2
+      rate-limiter-flexible: 5.0.3
 
   ansi-align@3.0.1:
     dependencies:
@@ -4237,6 +4257,8 @@ snapshots:
   queue-microtask@1.2.3: {}
 
   quick-lru@5.1.1: {}
+
+  rate-limiter-flexible@5.0.3: {}
 
   rc9@2.1.2:
     dependencies:
