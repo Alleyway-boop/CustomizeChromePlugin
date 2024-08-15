@@ -127,7 +127,7 @@ function RecoverAllTab() {
   });
 }
 function GetSystemMemory() {
-// todo 目前似乎难以完成，在浏览器环境中获取系统内存，这个行为可能会被浏览器禁止
+  // todo 目前似乎难以完成，在浏览器环境中获取系统内存，这个行为可能会被浏览器禁止
 }
 </script>
 
