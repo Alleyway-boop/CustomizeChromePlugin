@@ -16,3 +16,5 @@ const Input = defineComponent({
         )
     }
 })
+
+export default Input;
