@@ -34,14 +34,36 @@ interface FreezeTabStatus {
 const freezeTabStatusList: FreezeTabStatus[] = [];
 browser.runtime.onInstalled.addListener(() => {
   browser.contextMenus.create({
-    id: 'sampleContextMenu',
+    id: 'FreezeTab',
     title: '冻结此页面',
+    contexts: ['page'],
+    enabled: true,
+    documentUrlPatterns: ['http://*/*', 'https://*/*']
+  })
+  // add whitelist
+  browser.contextMenus.create({
+    id: 'whitelist',
+    title: '添加到白名单',
     contexts: ['page'],
     documentUrlPatterns: ['http://*/*', 'https://*/*']
   })
 })
 browser.contextMenus.onClicked.addListener((info, tab) => {
-  FreezeTab(tab?.id!)
+  switch (info.menuItemId) {
+    case 'FreezeTab':
+      FreezeTab(tab?.id!);
+      break;
+    case 'whitelist':
+      browser.storage.sync.get('whitelist').then((res) => {
+        let whitelist: string[] = [];
+        if (res.whitelist) {
+          whitelist = res.whitelist;
+        }
+        whitelist.push(tab?.url!);
+        browser.storage.sync.set({ 'whitelist': whitelist });
+      });
+      break;
+  }
 })
 browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: SendResponse) => {
   if (request.getTabId) {
@@ -180,6 +202,15 @@ setInterval(() => {
   });
   const now = Date.now();
   tabStatusList.forEach((item) => {
+    browser.storage.sync.get('whitelist').then((res) => {
+      let whitelist: string[] = [];
+      if (res.whitelist) {
+        whitelist = res.whitelist;
+      }
+      if (whitelist.findIndex((url) => item.url.includes(url)) !== -1) {
+        return;
+      }
+    });
     if (now - item.lastUseTime > 1000 * 60 * FreezeTimeout.value) {
       browser.tabs.get(item.tabId).then((tab) => {
         if (tab.pinned && !FreezePinned.value) {
