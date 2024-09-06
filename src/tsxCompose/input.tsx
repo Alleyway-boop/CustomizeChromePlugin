@@ -1,7 +1,7 @@
 import { defineComponent } from 'vue';
 
 interface InputProps {
-    value: string;
+    value?: string;
     onChange: (value: string) => void;
 }
 const Input = defineComponent({

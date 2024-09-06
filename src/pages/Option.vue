@@ -2,7 +2,7 @@
 import { ref, onMounted, watchEffect } from 'vue';
 import { NButton, NIcon, NModal, NUpload, NUploadDragger, UploadFileInfo, UploadSettledFileInfo } from 'naive-ui';
 import browser from 'webextension-polyfill';
-
+import Input from '../tsxCompose/input'
 // 获取当前页面的完整 URL
 const FullPath = window.location.href;
 
@@ -74,6 +74,9 @@ onMounted(() => {
         }
     })
 })
+function onChange(e: Event) {
+    console.log('onChange:', e)
+}
 </script>
 
 <template>

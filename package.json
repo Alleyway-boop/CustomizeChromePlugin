@@ -13,6 +13,7 @@
     "@iconify-json/carbon": "^1.1.36",
     "@iconify-json/cib": "^1.1.8",
     "@iconify-json/mingcute": "^1.1.18",
+    "@vitejs/plugin-vue-jsx": "^4.0.1",
     "@vueuse/motion": "^2.2.3",
     "alova": "^3.0.2",
     "vue": "^3.4.30"
