@@ -17,4 +17,4 @@ const Input = defineComponent({
     }
 })
 
-export default Input;
+export default Input as typeof Input & { props: InputProps };
