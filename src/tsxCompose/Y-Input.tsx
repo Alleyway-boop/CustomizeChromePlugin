@@ -10,7 +10,6 @@ const Input = defineComponent({
             const target = event.target as HTMLInputElement;
             props.onChange(target.value);
         }
-
         return () => (
             <input value={props.value} onInput={handleChange} />
         )
