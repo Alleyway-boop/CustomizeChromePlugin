@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { fileURLToPath, URL } from 'node:url'
 import vue from "@vitejs/plugin-vue";
 import webExtension, { readJsonFile } from "vite-plugin-web-extension";
 import vueJsx from "@vitejs/plugin-vue-jsx";
@@ -27,5 +28,10 @@ export default defineConfig({
   ],
   build: {
     sourcemap: false
-  }
+  },
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL('./src', import.meta.url))
+    },
+  },
 });

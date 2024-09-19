@@ -5,6 +5,7 @@ import browser from 'webextension-polyfill';
 import { useDebounceFn } from '@vueuse/core'
 import { darkTheme } from 'naive-ui'
 import type { GlobalTheme } from 'naive-ui'
+import demo from '../tsxCompose/Y-Menu';
 const theme = ref<GlobalTheme>(darkTheme)
 
 console.log("Hello from the popup!");
@@ -149,6 +150,7 @@ function GetSystemMemory() {
           不清理固定标签页
         </template>
       </NSwitch>
+      <demo />
       <!-- 显示当前被插件管理的页面 -->
       <NScrollbar trigger="none">
         <NCollapse :accordion="true" class="w-[calc(100%-8px)]">
