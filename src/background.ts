@@ -201,13 +201,9 @@ setInterval(() => {
     }
   });
   const now = Date.now();
-  tabStatusList.forEach((item) => {
-    browser.storage.sync.get('whitelist').then((res) => {
-      let whitelist: string[] = [];
-      if (res.whitelist) {
-        whitelist = res.whitelist;
-      }
-      if (whitelist.findIndex((url) => item.url.includes(url)) !== -1) {
+  tabStatusList.forEach(async (item) => {
+    await browser.storage.sync.get('whitelist').then((res) => {
+      if (res.whitelist.findIndex((url: string) => item.url.includes(url)) !== -1) {
         return;
       }
     });

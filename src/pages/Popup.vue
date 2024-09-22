@@ -5,7 +5,6 @@ import browser from 'webextension-polyfill';
 import { useDebounceFn } from '@vueuse/core'
 import { darkTheme } from 'naive-ui'
 import type { GlobalTheme } from 'naive-ui'
-import demo from '../tsxCompose/Y-Menu';
 const theme = ref<GlobalTheme>(darkTheme)
 
 console.log("Hello from the popup!");
@@ -127,9 +126,6 @@ function RecoverAllTab() {
     console.error('Error RecoverTab:', error);
   });
 }
-function GetSystemMemory() {
-  // todo 目前似乎难以完成，在浏览器环境中获取系统内存，这个行为可能会被浏览器禁止
-}
 </script>
 
 <template class="w-300px h-400px p-0 m-0">
@@ -150,7 +146,6 @@ function GetSystemMemory() {
           不清理固定标签页
         </template>
       </NSwitch>
-      <demo />
       <!-- 显示当前被插件管理的页面 -->
       <NScrollbar trigger="none">
         <NCollapse :accordion="true" class="w-[calc(100%-8px)]">
