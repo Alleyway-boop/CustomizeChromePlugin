@@ -1,7 +1,5 @@
-import { Status } from 'naive-ui/es/progress/src/interface';
-import { ref, toRef, watch } from 'vue';
-import Browser, { Runtime } from 'webextension-polyfill';
-import browser from 'webextension-polyfill';
+import { ref, watch } from 'vue';
+import browser, { Runtime } from 'webextension-polyfill';
 import { Message, SendResponse } from './utils';
 
 const FreezeTimeout = ref();
@@ -203,6 +201,7 @@ setInterval(() => {
   const now = Date.now();
   tabStatusList.forEach(async (item) => {
     await browser.storage.sync.get('whitelist').then((res) => {
+      console.log('whitelist:', res.whitelist);
       if (res.whitelist.findIndex((url: string) => item.url.includes(url)) !== -1) {
         return;
       }
@@ -224,8 +223,7 @@ setInterval(() => {
     }
   });
   GetAllFreeTab();
-}
-  , 1000 * 5);
+}, 1000 * 5);
 function GetAllFreeTab() {
   // 获取当前浏览器页面所有的冻结页面
   // 每次获取之前先清空之前的数据
