@@ -1,5 +1,5 @@
 import { ref, watch } from 'vue';
-import browser, { Runtime } from 'webextension-polyfill';
+import browser, { ExtensionTypes, Runtime } from 'webextension-polyfill';
 import { Message, SendResponse } from './utils';
 
 const FreezeTimeout = ref();
@@ -182,7 +182,6 @@ browser.runtime.onInstalled.addListener(() => {
 function FreezeTab(tabId: number) {
   browser.tabs.get(tabId).then((tab) => {
     // 修改当前tab的url
-    console.log('tabxxx:', tab);
     browser.tabs.update(tabId, { url: browser.runtime.getURL('src/options.html') + `?title=${tab.title}&url=${tab.url != undefined ? encodeURIComponent(tab.url) : tab.url}&icon=${tab.favIconUrl}` });
     // 移除 tabStatusList 中的该项
     const index = tabStatusList.findIndex((tab) => tab.tabId === tabId);
@@ -201,8 +200,7 @@ setInterval(() => {
   const now = Date.now();
   tabStatusList.forEach(async (item) => {
     await browser.storage.sync.get('whitelist').then((res) => {
-      console.log('whitelist:', res.whitelist);
-      if (res.whitelist.findIndex((url: string) => item.url.includes(url)) !== -1) {
+      if (res.whitelist && res.whitelist.findIndex((url: string) => item.url.includes(url)) !== -1) {
         return;
       }
     });
@@ -269,4 +267,9 @@ async function recoverFreeTab() {
       });
     }
   });
+}
+
+// 获取网页截图
+async function captureVisibleTab(windowId?: number, options?: ExtensionTypes.ImageDetails): Promise<string> {
+  return await browser.tabs.captureVisibleTab(windowId, options);
 }
