@@ -37,6 +37,9 @@
     "storage",
     "contextMenus"
   ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "options_ui": {
     "page": "src/options.html",
     "open_in_tab": true
