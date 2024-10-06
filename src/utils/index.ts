@@ -8,6 +8,7 @@ interface Message {
   DeleteTab?: boolean;
   GetFreezeTabList?: boolean;
   RecoverFreezeTab?: boolean;
+  RemoveFreezeTab?: number;
 }
 interface Response {
   response: string | any[] | boolean | number | undefined;
