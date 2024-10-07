@@ -95,8 +95,16 @@ watch(FreezeTimeout, (newValue, oldValue) => {
   FreezeTimeoutDebouncedFn();
 });
 onMounted(() => {
-  getFreezePinned();
-  getFreezeTimeout();
+  browser.runtime.sendMessage({ getTabStatusList: true }).then((response) => {
+    TabStatusList.value = response.tabStatusList == undefined ? [] : response.tabStatusList;
+    console.log('Received tabStatusList:', response.tabStatusList);
+  });
+
+  browser.runtime.sendMessage({ getFreezeTabStatusList: true }).then((response) => {
+    console.log('Received freezeTabStatusList:', response.freezeTabStatusList);
+    freezeTabStatusList.value = response.freezeTabStatusList;
+  });
+  getFreezeTimeout()
 });
 // 先直接获取一次
 GetAllTabStatusList();
@@ -104,7 +112,7 @@ setInterval(() => {
   GetAllTabStatusList();
   browser.storage.sync.get('freezeTabStatusList').then((result) => {
     console.log('freezeTabStatusList:', result.freezeTabStatusList);
-    if (result.freezeTabStatusList.length > 0) {
+    if (result.freezeTabStatusList && result.freezeTabStatusList.length > 0) {
       RecoverTab.value = true
     } else {
       RecoverTab.value = false
