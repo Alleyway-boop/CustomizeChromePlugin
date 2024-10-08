@@ -96,8 +96,7 @@ watch(FreezeTimeout, (newValue, oldValue) => {
 });
 onMounted(() => {
   browser.runtime.sendMessage({ getTabStatusList: true }).then((response) => {
-    TabStatusList.value = response.tabStatusList == undefined ? [] : response.tabStatusList;
-    console.log('Received tabStatusList:', response.tabStatusList);
+    TabStatusList.value = response === undefined ? [] : response.tabStatusList;
   });
 
   browser.runtime.sendMessage({ getFreezeTabStatusList: true }).then((response) => {
@@ -111,7 +110,7 @@ GetAllTabStatusList();
 setInterval(() => {
   GetAllTabStatusList();
   browser.storage.sync.get('freezeTabStatusList').then((result) => {
-    console.log('freezeTabStatusList:', result.freezeTabStatusList);
+    // console.log('freezeTabStatusList:', result.freezeTabStatusList);
     if (result.freezeTabStatusList && result.freezeTabStatusList.length > 0) {
       RecoverTab.value = true
     } else {
@@ -132,6 +131,11 @@ function GetAllTabStatusList() {
 function RecoverAllTab() {
   browser.runtime.sendMessage({ RecoverTab: true }).catch((error) => {
     console.error('Error RecoverTab:', error);
+  });
+}
+function GotoTab(tabId: number) {
+  browser.runtime.sendMessage({ GotoTaskPage: true,data:tabId }).catch((error) => {
+    console.error('Error GotoTaskPage:', error);
   });
 }
 </script>
@@ -158,7 +162,7 @@ function RecoverAllTab() {
       <NScrollbar trigger="none">
         <NCollapse :accordion="true" class="w-[calc(100%-8px)]">
           <NCollapseItem title="当前活跃页面">
-            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in TabStatusList" :key="index">
+            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in TabStatusList" :key="index" @click="GotoTab(item.tabId)">
               <div class="flex justify-between items-center m-l m-r">
                 <NTooltip>
                   <template #trigger>
@@ -189,7 +193,7 @@ function RecoverAllTab() {
             </template>
           </NCollapseItem>
           <NCollapseItem title="已冻结Tab">
-            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in freezeTabStatusList" :key="index">
+            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in freezeTabStatusList" :key="index"  @click="GotoTab(item.tabId)">
               <div class="flex justify-between items-center m-l m-r m-b-0">
                 <div class="flex gap-8px items-center border-b-solid b-1px w-full h-46px">
                   <!-- <p class="m-l-10px">{{ index + 1 + '.' }}</p> -->

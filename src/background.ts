@@ -193,6 +193,9 @@ browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: S
     sendResponse({ response: 'Tab removed from freeze list' });
     return true;
   }
+  if(request.GotoTaskPage){
+    browser.tabs.update(request.data, { active: true });
+  }
 });
 
 // 上下文菜单
