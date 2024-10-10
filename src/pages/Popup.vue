@@ -3,9 +3,6 @@ import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NTooltip, NIcon, NScro
 import { onMounted, ref, watch } from 'vue';
 import browser from 'webextension-polyfill';
 import { useDebounceFn } from '@vueuse/core'
-import { darkTheme } from 'naive-ui'
-import type { GlobalTheme } from 'naive-ui'
-const theme = ref<GlobalTheme>(darkTheme)
 
 console.log("Hello from the popup!");
 browser.runtime.sendMessage({ GetTabStatusList: true }).then((response) => {
