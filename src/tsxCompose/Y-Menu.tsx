@@ -1,12 +1,61 @@
-import { defineComponent } from "vue";
+import { defineComponent, PropType, ref } from "vue";
+
+interface MenuItem {
+    id: number;
+    label: string;
+    link?: string;
+    children?: MenuItem[];
+}
+
+const MenuItemComponent = defineComponent({
+    props: {
+        item: {
+            type: Object as PropType<MenuItem>,
+            required: true
+        }
+    },
+    setup(props) {
+        const isHovered = ref(false);
+
+        return () => (
+            <li
+                class="menu-item"
+                onMouseenter={() => isHovered.value = true}
+                onMouseleave={() => isHovered.value = false}
+            >
+                {props.item.link ? (
+                    <a href={props.item.link}>{props.item.label}</a>
+                ) : (
+                    <span>{props.item.label}</span>
+                )}
+                {props.item.children && props.item.children.length > 0 && (
+                    <ul class={`submenu ${isHovered.value ? 'active' : ''}`}>
+                        {props.item.children.map(child => (
+                            <MenuItemComponent key={child.id} item={child} />
+                        ))}
+                    </ul>
+                )}
+            </li>
+        );
+    }
+});
 
 export default defineComponent({
-    setup() {
+    props: {
+        items: {
+            type: Array as PropType<MenuItem[]>,
+            required: true
+        }
+    },
+    setup(props) {
         return () => (
-            <div class="container">
-                <h1 class="title">TSX Compose Demo</h1>
-                <p class="description">This is a demo of TSX Compose.</p>
-            </div>
+            <nav class="y-menu">
+                <ul class="menu">
+                    {props.items.map(item => (
+                        <MenuItemComponent key={item.id} item={item} />
+                    ))}
+                </ul>
+            </nav>
         );
     },
 });
