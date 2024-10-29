@@ -1,5 +1,5 @@
 import { defineComponent, PropType, ref } from "vue";
-
+import './global.css';
 interface MenuItem {
     id: number;
     label: string;

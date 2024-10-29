@@ -28,3 +28,111 @@
     display: block;
     margin: 5px 0;
 }
+
+.y-table {
+  position: relative;
+  width: 100%;
+  overflow: auto;
+}
+
+.y-table__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+}
+
+.y-table__header-row,
+.y-table__body-row {
+  display: flex;
+  width: 100%;
+}
+
+.y-table__cell {
+  flex-shrink: 0;
+  padding: 12px 8px;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.y-table__header-cell {
+  background-color: #f5f7fa;
+  font-weight: bold;
+}
+
+.y-table__body-row:hover {
+  background-color: #f5f7fa;
+}
+
+.y-table--border .y-table__cell {
+  border: 1px solid #ebeef5;
+}
+
+/* 固定列样式 */
+.y-table__cell.is-fixed-left {
+  position: sticky;
+  left: 0;
+  background: inherit;
+  z-index: 1;
+}
+
+.y-table__cell.is-fixed-right {
+  position: sticky;
+  right: 0;
+  background: inherit;
+  z-index: 1;
+}
+
+/* 虚拟滚动相关 */
+.y-table__body {
+  position: relative;
+  overflow-y: auto;
+}
+
+.y-table__body-row {
+  position: absolute;
+  width: 100%;
+  left: 0;
+}
+
+/* 树形表格相关 */
+.y-table__expand-icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* 排序相关 */
+.y-table__sort-icons {
+  display: inline-flex;
+  flex-direction: column;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+/* 筛选相关 */
+.y-table__filter {
+  display: inline-block;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.y-table__filter-dropdown {
+  position: absolute;
+  background: white;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 8px;
+  z-index: 3;
+}
+
+/* 合并单元格相关 */
+.y-table__cell--span {
+  position: relative;
+}
