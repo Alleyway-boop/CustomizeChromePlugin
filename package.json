@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build && node .\\script\\CallReplaceScript.cjs",
+    "build": "vite build && vue-tsc && node .\\script\\CallReplaceScript.cjs",
     "Debug": "vite build --debug",
     "replace": "node .\\script\\CallReplaceScript.cjs"
   },

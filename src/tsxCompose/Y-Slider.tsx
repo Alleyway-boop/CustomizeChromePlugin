@@ -47,12 +47,14 @@ export default defineComponent({
             default: (value: number) => value.toString(),
         },
     },
-    setup(props) {
+    setup(props, { emit, slots }) {
         const value = ref(props.min);
 
         const handleChange = (event: Event) => {
             const target = event.target as HTMLInputElement;
             value.value = Number(target.value);
+            emit('input', value.value);
+            emit('change', value.value);
         };
 
         const sliderStyle = {
@@ -62,17 +64,21 @@ export default defineComponent({
 
         return () => (
             <div style={sliderStyle}>
-                <input
-                    type="range"
-                    min={props.min}
-                    max={props.max}
-                    step={props.step}
-                    value={value.value}
-                    onInput={handleChange}
-                    style={{ writingMode: props.vertical ? 'bt-lr' : 'horizontal-tb' } as any}
-                />
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                    {slots.prefix && <span class="prefix-icon">{slots.prefix()}</span>}
+                    <input
+                        type="range"
+                        min={props.min}
+                        max={props.max}
+                        step={props.step}
+                        value={value.value}
+                        onInput={handleChange}
+                        style={{ writingMode: props.vertical ? 'bt-lr' : 'horizontal-tb' } as any}
+                    />
+                    {slots.suffix && <span class="suffix-icon">{slots.suffix()}</span>}
+                </div>
                 <div>
-                    {props.customLabel(value.value)}
+                    {slots.label ? slots.label({ value: value.value }) : props.customLabel(value.value)}
                 </div>
                 {props.marks.length > 0 && (
                     <div>
