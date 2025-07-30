@@ -4,7 +4,7 @@ import { Message, SendResponse } from './utils';
 
 // 配置和状态
 let whitelist: string[] = [];
-let FreezeTimeout = 20; // 默认值，单位：分钟
+let FreezeTimeout: number = 20; // 默认值，单位：分钟
 const FreezePinned = ref(false);
 
 interface TabStatus {
@@ -26,7 +26,7 @@ let tabStatusList: TabStatus[] = [];
 let freezeTabStatusList: FreezeTabStatus[] = [];
 
 // 初始化
-browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then((res) => {
+browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then((res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[] }) => {
   if (res.FreezeTimeout) FreezeTimeout = res.FreezeTimeout;
   if (res.FreezePinned !== undefined) FreezePinned.value = res.FreezePinned;
   if (res.whitelist) whitelist = res.whitelist;
@@ -36,16 +36,16 @@ browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then((r
 // 监听存储变化
 browser.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync') {
-    if (changes.FreezeTimeout) FreezeTimeout = changes.FreezeTimeout.newValue;
-    if (changes.FreezePinned) FreezePinned.value = changes.FreezePinned.newValue;
-    if (changes.whitelist) whitelist = changes.whitelist.newValue;
+    if (changes.FreezeTimeout) FreezeTimeout = changes.FreezeTimeout.newValue as number;
+    if (changes.FreezePinned) FreezePinned.value = changes.FreezePinned.newValue as boolean;
+    if (changes.whitelist) whitelist = changes.whitelist.newValue as string[];
   }
 });
 
 // 在加载存储的冻结标签页之后添加日志
 browser.storage.sync.get('freezeTabStatusList').then((res) => {
   if (res.freezeTabStatusList) {
-    freezeTabStatusList = res.freezeTabStatusList;
+    freezeTabStatusList = res.freezeTabStatusList as FreezeTabStatus[];
     console.log('Loaded freezeTabStatusList:', freezeTabStatusList);
   }
 });
@@ -166,7 +166,8 @@ async function saveFreeTab() {
 setInterval(checkAndFreezeTabs, 60000); // 每分钟检查一次
 
 // 消息处理
-browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: SendResponse) => {
+browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendResponse) => {
+  const request = req as Message;
   if (request.UpDateLastUseTime && sender.tab?.id) {
     const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
     console.log('Update last use time:', tabStatus);
@@ -193,9 +194,10 @@ browser.runtime.onMessage.addListener((request: Message, sender, sendResponse: S
     sendResponse({ response: 'Tab removed from freeze list' });
     return true;
   }
-  if(request.GotoTaskPage){
+  if (request.GotoTaskPage) {
     browser.tabs.update(request.data, { active: true });
   }
+  return true;
 });
 
 // 上下文菜单
