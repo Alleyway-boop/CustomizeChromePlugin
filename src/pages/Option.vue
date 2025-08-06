@@ -12,6 +12,16 @@ import {
 import browser from "webextension-polyfill";
 import { useElementHover } from "@vueuse/core";
 
+// 安全的 URL 解码函数
+function decodeURIComponentSafe(encoded: string): string {
+    try {
+        return decodeURIComponent(encoded);
+    } catch (error) {
+        console.error("Failed to decodeURIComponent:", error);
+        return encoded; // 如果解码失败，返回原始字符串
+    }
+}
+
 // 获取当前页面的完整 URL
 const FullPath = window.location.href;
 // 从 FullPath 中提取出当前页面的路径
@@ -24,8 +34,8 @@ const urlParams = new URLSearchParams(window.location.search);
 console.log("URL Params:", urlParams);
 const title = ref<string>(urlParams.get("title") || "");
 const url = ref<string>(
-    urlParams.get("url") 
-        ? decodeURIComponent(urlParams.get("url")!)
+    urlParams.get("url")
+        ? decodeURIComponentSafe(urlParams.get("url")!)
         : ""
 );
 const icon = ref<string>(urlParams.get("icon") || "");
@@ -113,14 +123,14 @@ function onChange(e: Event) {
 </script>
 
 <template>
-    <div class="flex justify-center items-center text-center font-bold text-white h-full" @click="BackSource">
+    <div class="flex justify-center items-center text-center font-bold text-white h-[100vh] relative" @click="BackSource">
         <div>
-            <img src="/icon-with-shadow.svg" alt="Icon" class="max-h-[30vh]" />
+            <img src="/icon-with-shadow.svg" alt="Icon" class="max-h-[40vh]" v-if="!snapshot" />
             <h1>{{ title || "vite-plugin-web-extension" }}</h1>
             <p>Template: <code>vue-ts</code></p>
             <NButton class="" @click.stop="showModal = !showModal">上传自定义背景</NButton>
-            <div ref="snapshotBox">
-                <img v-if="snapshot" :src="snapshot" alt="Snapshot" class="m-t-[30%] max-w-[99%] b-rd-lg" />
+            <div ref="snapshotBox" class="absolute inset-0 w-full h-full pointer-events-none -z-10" v-if="!background?.length">
+                <img v-if="snapshot" :src="snapshot" alt="Snapshot" class="absolute inset-0 w-full h-full object-cover" />
             </div>
         </div>
         <NModal v-model:show="showModal" class="max-w-[30%]">

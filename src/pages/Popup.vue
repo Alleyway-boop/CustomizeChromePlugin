@@ -3,7 +3,7 @@ import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NTooltip, NIcon, NScro
 import { onMounted, ref, watch } from 'vue';
 import browser from 'webextension-polyfill';
 import { useDebounceFn } from '@vueuse/core';
-import type { TabStatus, FreezeTabStatus, Message, Response } from '../utils';
+import type { TabStatus, FreezeTabStatus, Message, Response, SendResponse } from '../utils';
 
 console.log("Hello from the popup!");
 browser.runtime.sendMessage({ GetTabStatusList: true }).then((response) => {
@@ -15,6 +15,7 @@ const enabled = ref<boolean>(true);
 const RecoverTab = ref(false);
 const TabStatusList = ref<TabStatus[]>([]);
 const freezeTabStatusList = ref<FreezeTabStatus[]>([]);
+const whiteList = ref<string[]>([]);
 
 function setFreezePinned() {
   browser.storage.sync.set({ "FreezePinned": FreezePinned.value }).catch((error) => {
@@ -80,7 +81,7 @@ onMounted(() => {
     TabStatusList.value = response === undefined ? [] : response.tabStatusList;
   });
 
-  browser.runtime.sendMessage({ getFreezeTabStatusList: true }).then((response : any) => {
+  browser.runtime.sendMessage({ getFreezeTabStatusList: true }).then((response: any) => {
     console.log('Received freezeTabStatusList:', response.freezeTabStatusList);
     freezeTabStatusList.value = response.freezeTabStatusList;
   });
@@ -107,6 +108,9 @@ function GetAllTabStatusList() {
   });
   browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: any) => {
     freezeTabStatusList.value = response.response;
+  });
+  browser.runtime.sendMessage<Message, Response>({ GetWhiteList: true }).then((response) => {
+    whiteList.value = response.response as unknown as string[];
   });
 }
 function RecoverAllTab() {

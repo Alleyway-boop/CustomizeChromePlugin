@@ -195,7 +195,7 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     sendResponse({ response: 'Tab removed from freeze list' });
   }
   if (request.GetWhiteList) {
-    sendResponse({ response: whitelist as any });
+    sendResponse({ response: whitelist});
   }
   if (request.GotoTaskPage && request.data !== undefined) {
     browser.tabs.update(request.data as number, { active: true });

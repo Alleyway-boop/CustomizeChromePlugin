@@ -30,7 +30,7 @@ interface FreezeTabStatus {
   title: string;
 }
 interface Response {
-  response: string | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined;
+  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined;
   tabId?: number;
 }
 type SendResponse = (response?: Response) => void;
