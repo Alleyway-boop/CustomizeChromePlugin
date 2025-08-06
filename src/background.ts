@@ -1,6 +1,9 @@
 import { ref } from 'vue';
 import browser from 'webextension-polyfill';
 import { Message, SendResponse } from './utils';
+import { safeAsync, safeStorage, safeTabs, ExtensionError, ErrorCodes } from './utils/error-handler';
+import { SmartScheduler } from './utils/performance';
+import { configManager } from './utils/config';
 
 // 配置和状态
 let whitelist: string[] = [];
@@ -55,9 +58,10 @@ function addTabToList(tab: browser.Tabs.Tab) {
   if (tab.id === undefined) return;
   if (tab.pinned && !FreezePinned.value) return;
   if (!tab.url?.startsWith('http')) return;
-  tabStatusList.forEach((item) => {
-    if (item.tabId === tab.id) return;
-  });
+  
+  const existingTab = tabStatusList.find(item => item.tabId === tab.id);
+  if (existingTab) return;
+  
   const newTab: TabStatus = {
     tabId: tab.id,
     url: tab.url || '',
@@ -178,24 +182,23 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
       addTabToList(sender.tab);
       sendResponse({ response: 'Tab added and last use time set' });
     }
-    return true;
   }
   if (request.GetTabStatusList) {
     sendResponse({ response: tabStatusList });
-    return true;
   }
   if (request.GetFreezeTabList) {
     sendResponse({ response: freezeTabStatusList });
-    return true;
   }
   if (request.RemoveFreezeTab) {
     freezeTabStatusList = freezeTabStatusList.filter((tab) => tab.tabId !== request.RemoveFreezeTab);
     saveFreeTab();
     sendResponse({ response: 'Tab removed from freeze list' });
-    return true;
   }
-  if (request.GotoTaskPage) {
-    browser.tabs.update(request.data, { active: true });
+  if (request.GetWhiteList) {
+    sendResponse({ response: whitelist as any });
+  }
+  if (request.GotoTaskPage && request.data !== undefined) {
+    browser.tabs.update(request.data as number, { active: true });
   }
   return true;
 });

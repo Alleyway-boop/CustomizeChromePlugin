@@ -2,35 +2,19 @@
 import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NTooltip, NIcon, NScrollbar, NLayout } from 'naive-ui';
 import { onMounted, ref, watch } from 'vue';
 import browser from 'webextension-polyfill';
-import { useDebounceFn } from '@vueuse/core'
+import { useDebounceFn } from '@vueuse/core';
+import type { TabStatus, FreezeTabStatus, Message, Response } from '../utils';
 
 console.log("Hello from the popup!");
 browser.runtime.sendMessage({ GetTabStatusList: true }).then((response) => {
   console.log('GetTabStatusList:', response);
 });
-const FreezePinned = ref();
-const FreezeTimeout = ref();
-const disabled = ref(true);
+const FreezePinned = ref<boolean>();
+const FreezeTimeout = ref<number>();
+const enabled = ref<boolean>(true);
 const RecoverTab = ref(false);
-interface TabStatus {
-  tabId: number;
-  url: string;
-  icon: string;
-  title: string;
-  lastUseTime: number;
-}
 const TabStatusList = ref<TabStatus[]>([]);
-interface FreezeTabStatus {
-  tabId: number;
-  url: string;
-  icon: string;
-  title: string;
-}
 const freezeTabStatusList = ref<FreezeTabStatus[]>([]);
-interface Response {
-  response: string | TabStatus[];
-  tabId?: number;
-}
 
 function setFreezePinned() {
   browser.storage.sync.set({ "FreezePinned": FreezePinned.value }).catch((error) => {
@@ -52,7 +36,7 @@ function getFreezePinned() {
       });
       FreezePinned.value = true;
     }
-    FreezePinned.value = result.FreezePinned;
+    FreezePinned.value = result.FreezePinned as boolean;
   }).catch((error) => {
     console.error('Error getting FreezePinned:', error);
   });
@@ -67,7 +51,7 @@ function getFreezeTimeout() {
         console.error('Error setting FreezeTimeout:', error);
       });
     }
-    FreezeTimeout.value = result.FreezeTimeout;
+    FreezeTimeout.value = result.FreezeTimeout as number;
   }).catch((error) => {
     console.error('Error getting FreezeTimeout:', error);
   });
@@ -76,7 +60,7 @@ function getFreezeTimeout() {
 browser.storage.onChanged.addListener((changes, area) => {
   if (area === 'sync' && changes.FreezePinned) {
     console.warn('Storage onChanged:', changes.FreezePinned.newValue);
-    FreezePinned.value = changes.FreezePinned.newValue;
+    FreezePinned.value = changes.FreezePinned.newValue as boolean;
   }
 });
 const FreezeTimeoutDebouncedFn = useDebounceFn(() => {
@@ -92,11 +76,11 @@ watch(FreezeTimeout, (newValue, oldValue) => {
   FreezeTimeoutDebouncedFn();
 });
 onMounted(() => {
-  browser.runtime.sendMessage({ getTabStatusList: true }).then((response) => {
+  browser.runtime.sendMessage({ getTabStatusList: true }).then((response: any) => {
     TabStatusList.value = response === undefined ? [] : response.tabStatusList;
   });
 
-  browser.runtime.sendMessage({ getFreezeTabStatusList: true }).then((response) => {
+  browser.runtime.sendMessage({ getFreezeTabStatusList: true }).then((response : any) => {
     console.log('Received freezeTabStatusList:', response.freezeTabStatusList);
     freezeTabStatusList.value = response.freezeTabStatusList;
   });
@@ -106,7 +90,7 @@ onMounted(() => {
 GetAllTabStatusList();
 setInterval(() => {
   GetAllTabStatusList();
-  browser.storage.sync.get('freezeTabStatusList').then((result) => {
+  browser.storage.sync.get('freezeTabStatusList').then((result: any) => {
     // console.log('freezeTabStatusList:', result.freezeTabStatusList);
     if (result.freezeTabStatusList && result.freezeTabStatusList.length > 0) {
       RecoverTab.value = true
@@ -118,10 +102,10 @@ setInterval(() => {
   });
 }, 1000);
 function GetAllTabStatusList() {
-  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response) => {
+  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: any) => {
     TabStatusList.value = response.response;
   });
-  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response) => {
+  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: any) => {
     freezeTabStatusList.value = response.response;
   });
 }
@@ -131,7 +115,7 @@ function RecoverAllTab() {
   });
 }
 function GotoTab(tabId: number) {
-  browser.runtime.sendMessage({ GotoTaskPage: true,data:tabId }).catch((error) => {
+  browser.runtime.sendMessage({ GotoTaskPage: true, data: tabId }).catch((error) => {
     console.error('Error GotoTaskPage:', error);
   });
 }
@@ -139,12 +123,12 @@ function GotoTab(tabId: number) {
 
 <template class="w-300px h-400px p-0 m-0">
   <NLayout class="select-none">
-    <div class="h-full flex flex-col gap-16px items-center mt-3">
-      <img src="/icon-with-shadow.svg" class=" w-50px h-50px" />
-      <h1 class="text-18px font-bold m-0">YuanFang</h1>
-      <div class="flex justify-between content-center items-center  m-10px">
-        <NSwitch v-model:value="disabled" />
-        <NInputNumber v-model:value="FreezeTimeout" max="360" min="3" size="small" :disabled="disabled" />
+    <div class="h-full flex flex-col gap-[16px] items-center mt-3">
+      <img src="/icon-with-shadow.svg" class="w-[50px] h-[50px]" />
+      <h1 class="text-[18px] font-bold m-0">YuanFang</h1>
+      <div class="flex justify-between content-center items-center m-[10px]">
+        <NSwitch v-model:value="enabled" />
+        <NInputNumber v-model:value="FreezeTimeout" max="360" min="3" size="small" :disabled="!enabled" />
         <div class="w-full">分钟后冻结标签页</div>
       </div>
       <NSwitch v-model:value="FreezePinned" :round="false">
@@ -159,14 +143,15 @@ function GotoTab(tabId: number) {
       <NScrollbar trigger="none">
         <NCollapse :accordion="true" class="w-[calc(100%-8px)]">
           <NCollapseItem title="当前活跃页面">
-            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in TabStatusList" :key="index" @click="GotoTab(item.tabId)">
+            <div class="flex flex-col gap-[8px] w-full" v-for="(item, index) in TabStatusList" :key="index"
+              @click="GotoTab(item.tabId)">
               <div class="flex justify-between items-center m-l m-r">
                 <NTooltip>
                   <template #trigger>
-                    <div class="flex gap-8px items-center border-b-solid b-1px w-full h-46px">
+                    <div class="flex gap-[8px] items-center border-b-solid border w-full h-[46px]">
                       <!-- <p class="m-l-10px">{{ index + 1 + '.' }}</p> -->
-                      <img :src="item.icon" class="w-16px h-16px" />
-                      <p class="overflow-hidden text-ellipsis whitespace-nowrap w-200px">{{ item.title }}</p>
+                      <img :src="item.icon" class="w-[16px] h-[16px]" />
+                      <p class="overflow-hidden text-ellipsis whitespace-nowrap w-[200px]">{{ item.title }}</p>
                     </div>
                   </template>
                   <div> {{ new Date(item.lastUseTime).toLocaleString() }}</div>
@@ -190,12 +175,13 @@ function GotoTab(tabId: number) {
             </template>
           </NCollapseItem>
           <NCollapseItem title="已冻结Tab">
-            <div class="flex flex-col gap-8px w-full" v-for="(item, index) in freezeTabStatusList" :key="index"  @click="GotoTab(item.tabId)">
+            <div class="flex flex-col gap-[8px] w-full" v-for="(item, index) in freezeTabStatusList" :key="index"
+              @click="GotoTab(item.tabId)">
               <div class="flex justify-between items-center m-l m-r m-b-0">
-                <div class="flex gap-8px items-center border-b-solid b-1px w-full h-46px">
+                <div class="flex gap-[8px] items-center border-b-solid border w-full h-[46px]">
                   <!-- <p class="m-l-10px">{{ index + 1 + '.' }}</p> -->
-                  <img :src="item.icon" class="w-16px h-16px" />
-                  <p class="overflow-hidden text-ellipsis whitespace-nowrap w-200px">{{ item.title }}</p>
+                  <img :src="item.icon" class="w-[16px] h-[16px]" />
+                  <p class="overflow-hidden text-ellipsis whitespace-nowrap w-[200px]">{{ item.title }}</p>
                 </div>
               </div>
             </div>

@@ -5,20 +5,33 @@ interface Message {
   UpDateLastUseTime?: boolean;
   getTabActive?: boolean;
   GetTabStatusList?: boolean;
+  GetWhiteList?: boolean;
   DeleteTab?: boolean;
   GetFreezeTabList?: boolean;
   RecoverFreezeTab?: boolean;
+  RecoverTab?: boolean;
   RemoveFreezeTab?: number;
   GotoTaskPage?: boolean;
-  data?: any;
+  data?: unknown;
+}
+
+interface TabStatus {
+  tabId: number;
+  url: string;
+  icon: string;
+  title: string;
+  lastUseTime: number;
+}
+
+interface FreezeTabStatus {
+  tabId: number;
+  url: string;
+  icon: string;
+  title: string;
 }
 interface Response {
-  response: string | any[] | boolean | number | undefined;
+  response: string | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined;
   tabId?: number;
 }
 type SendResponse = (response?: Response) => void;
-// todo 将数据保存到服务器
-function Save2server() {
-
-}
-export type { Message, Response, SendResponse }
+export type { Message, Response, SendResponse, TabStatus, FreezeTabStatus }

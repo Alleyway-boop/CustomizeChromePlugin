@@ -22,13 +22,13 @@ const snapshotBox = useTemplateRef('snapshotBox')
 // 解析 URL 参数
 const urlParams = new URLSearchParams(window.location.search);
 console.log("URL Params:", urlParams);
-const title = ref<string>(urlParams.get("title")!);
+const title = ref<string>(urlParams.get("title") || "");
 const url = ref<string>(
-    urlParams.get("url") != undefined
+    urlParams.get("url") 
         ? decodeURIComponent(urlParams.get("url")!)
         : ""
 );
-const icon = ref<string>(urlParams.get("icon")!);
+const icon = ref<string>(urlParams.get("icon") || "");
 const background = ref<string>();
 const snapshot = ref<string>("");
 
@@ -51,12 +51,12 @@ onMounted(() => {
     console.log("Icon:", icon.value);
 
     // 监听来自背景脚本的消息
-    browser.runtime.onMessage.addListener((message) => {
+    browser.runtime.onMessage.addListener((message: any) => {
         if (message.type === "setSnapshot") {
             snapshot.value = message.snapshot;
         }
     });
-    browser.storage.local.get("backgroundImage").then((result) => {
+    browser.storage.local.get("backgroundImage").then((result: any) => {
         if (result.backgroundImage) {
             background.value = result.backgroundImage;
             document.body.style.backgroundImage = `url(${background.value})`;
@@ -68,7 +68,7 @@ onMounted(() => {
 function BackSource() {
     window.location.href = url.value;
     // 通知移除freezeTab
-    browser.storage.sync.get('freezeTabStatusList').then((result) => {
+    browser.storage.sync.get('freezeTabStatusList').then((result: any) => {
         const freezeTab = result.freezeTabStatusList.find((item: any) => item.url === url.value);
         if (freezeTab) {
             browser.runtime.sendMessage({ RemoveFreezeTab: freezeTab.tabId }).then((response) => {
@@ -115,15 +115,15 @@ function onChange(e: Event) {
 <template>
     <div class="flex justify-center items-center text-center font-bold text-white h-full" @click="BackSource">
         <div>
-            <img src="/icon-with-shadow.svg" alt="Icon" class="max-h-30vh" />
+            <img src="/icon-with-shadow.svg" alt="Icon" class="max-h-[30vh]" />
             <h1>{{ title || "vite-plugin-web-extension" }}</h1>
             <p>Template: <code>vue-ts</code></p>
             <NButton class="" @click.stop="showModal = !showModal">上传自定义背景</NButton>
             <div ref="snapshotBox">
-                <img v-if="snapshot" :src="snapshot" alt="Snapshot" class="m-t-30% max-w-99% b-rd-lg" />
+                <img v-if="snapshot" :src="snapshot" alt="Snapshot" class="m-t-[30%] max-w-[99%] b-rd-lg" />
             </div>
         </div>
-        <NModal v-model:show="showModal" class="max-w-30%">
+        <NModal v-model:show="showModal" class="max-w-[30%]">
             <NUpload :max="1" :default-file-list="previewFileList" list-type="image" file-list-class="bg-white"
                 action="" @finish="handleFinish">
                 <NUploadDragger>
