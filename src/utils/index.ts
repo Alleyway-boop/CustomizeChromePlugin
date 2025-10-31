@@ -3,8 +3,14 @@ interface Message {
   async?: boolean;
   getTabId?: boolean;
   UpDateLastUseTime?: boolean;
+  UpdatePageInfo?: boolean;
+  url?: string;
+  title?: string;
+  type?: string;
   getTabActive?: boolean;
   GetTabStatusList?: boolean;
+  GetRemainingTime?: boolean;
+  tabId?: number;
   GetWhiteList?: boolean;
   DeleteTab?: boolean;
   GetFreezeTabList?: boolean;
@@ -21,6 +27,8 @@ interface TabStatus {
   icon: string;
   title: string;
   lastUseTime: number;
+  windowId?: number;
+  active?: boolean;
 }
 
 interface FreezeTabStatus {
@@ -30,7 +38,7 @@ interface FreezeTabStatus {
   title: string;
 }
 interface Response {
-  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined;
+  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | { url?: string; title?: string };
   tabId?: number;
 }
 type SendResponse = (response?: Response) => void;
