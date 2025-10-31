@@ -11,7 +11,6 @@ interface Message {
   GetTabStatusList?: boolean;
   GetRemainingTime?: boolean;
   tabId?: number;
-  GetWhiteList?: boolean;
   DeleteTab?: boolean;
   GetFreezeTabList?: boolean;
   RecoverFreezeTab?: boolean;
@@ -19,6 +18,10 @@ interface Message {
   RemoveFreezeTab?: number;
   GotoTaskPage?: boolean;
   data?: unknown;
+  // New whitelist CRUD operations
+  GetWhitelist?: boolean;
+  AddToWhitelist?: string;
+  RemoveFromWhitelist?: string;
 }
 
 interface TabStatus {
@@ -38,8 +41,9 @@ interface FreezeTabStatus {
   title: string;
 }
 interface Response {
-  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | { url?: string; title?: string };
+  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | { url?: string; title?: string } | { success: boolean; message: string };
   tabId?: number;
+  error?: string;
 }
 type SendResponse = (response?: Response) => void;
 export type { Message, Response, SendResponse, TabStatus, FreezeTabStatus }

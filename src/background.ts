@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import browser from 'webextension-polyfill';
 import { Message, SendResponse } from './utils';
-import { safeAsync, safeStorage, safeTabs, ExtensionError, ErrorCodes } from './utils/error-handler';
+import { safeAsync, safeStorage, safeTabs, ExtensionError, ErrorCodes, isValidDomain, normalizeDomain } from './utils/error-handler';
 import { SmartScheduler } from './utils/performance';
 import { configManager } from './utils/config';
 
@@ -30,20 +30,79 @@ interface FreezeTabStatus {
 let tabStatusList: TabStatus[] = [];
 let freezeTabStatusList: FreezeTabStatus[] = [];
 
+// 白名单数据验证和清理
+async function validateAndCleanWhitelist(inputWhitelist: unknown): Promise<string[]> {
+  if (!Array.isArray(inputWhitelist)) {
+    console.warn('Invalid whitelist data from storage, expected array, got:', typeof inputWhitelist);
+    return [];
+  }
+
+  const cleanedWhitelist: string[] = [];
+
+  for (const item of inputWhitelist) {
+    if (typeof item === 'string' && item.trim()) {
+      const normalizedDomain = normalizeDomain(item.trim());
+      if (normalizedDomain && isValidDomain(normalizedDomain)) {
+        if (!cleanedWhitelist.includes(normalizedDomain)) {
+          cleanedWhitelist.push(normalizedDomain);
+        }
+      } else {
+        console.warn('Invalid domain in whitelist, removing:', item);
+      }
+    } else {
+      console.warn('Invalid item in whitelist, expected string, got:', typeof item);
+    }
+  }
+
+  return cleanedWhitelist;
+}
+
 // 初始化
-browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then((res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[] }) => {
+browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then(async (res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[] }) => {
   if (res.FreezeTimeout) FreezeTimeout = res.FreezeTimeout;
   if (res.FreezePinned !== undefined) FreezePinned.value = res.FreezePinned;
-  if (res.whitelist) whitelist = res.whitelist;
+
+  // 验证和清理白名单数据
+  if (res.whitelist) {
+    const cleanedWhitelist = await validateAndCleanWhitelist(res.whitelist);
+    whitelist = cleanedWhitelist;
+
+    // 如果清理过程中移除了无效数据，保存清理后的结果
+    if (cleanedWhitelist.length !== res.whitelist.length) {
+      console.log('Cleaned whitelist data during initialization:', {
+        original: res.whitelist.length,
+        cleaned: cleanedWhitelist.length,
+        removed: res.whitelist.length - cleanedWhitelist.length
+      });
+      await safeStorage.set({ whitelist: cleanedWhitelist });
+    }
+  } else {
+    whitelist = [];
+  }
+
   console.log('Initial config:', { FreezeTimeout, FreezePinned, whitelist });
 });
 
 // 监听存储变化
-browser.storage.onChanged.addListener((changes, area) => {
+browser.storage.onChanged.addListener(async (changes, area) => {
   if (area === 'sync') {
     if (changes.FreezeTimeout) FreezeTimeout = changes.FreezeTimeout.newValue as number;
     if (changes.FreezePinned) FreezePinned.value = changes.FreezePinned.newValue as boolean;
-    if (changes.whitelist) whitelist = changes.whitelist.newValue as string[];
+
+    if (changes.whitelist) {
+      const cleanedWhitelist = await validateAndCleanWhitelist(changes.whitelist.newValue);
+      whitelist = cleanedWhitelist;
+
+      // 如果清理过程中移除了无效数据，保存清理后的结果
+      if (Array.isArray(changes.whitelist.newValue) && cleanedWhitelist.length !== changes.whitelist.newValue.length) {
+        console.log('Cleaned whitelist data during storage change:', {
+          original: changes.whitelist.newValue.length,
+          cleaned: cleanedWhitelist.length,
+          removed: changes.whitelist.newValue.length - cleanedWhitelist.length
+        });
+        await safeStorage.set({ whitelist: cleanedWhitelist });
+      }
+    }
   }
 });
 
@@ -247,6 +306,111 @@ async function saveFreeTab() {
 // 定期检查是否需要冻结标签页
 setInterval(checkAndFreezeTabs, 60000); // 每分钟检查一次
 
+// 白名单管理函数
+async function getWhitelist(): Promise<string[]> {
+  try {
+    // 验证白名单数据完整性
+    if (!Array.isArray(whitelist)) {
+      console.warn('Whitelist is not an array, resetting to empty array');
+      whitelist = [];
+      await safeStorage.set({ whitelist });
+    }
+
+    // 过滤无效域名
+    const validDomains = whitelist.filter(domain => {
+      if (!domain || typeof domain !== 'string') return false;
+      return isValidDomain(domain);
+    });
+
+    // 如果发现无效域名，更新白名单
+    if (validDomains.length !== whitelist.length) {
+      console.log('Filtered invalid domains from whitelist:', {
+        original: whitelist.length,
+        filtered: validDomains.length,
+        removed: whitelist.length - validDomains.length
+      });
+      whitelist = validDomains;
+      await safeStorage.set({ whitelist });
+    }
+
+    console.log('Retrieved whitelist:', validDomains);
+    return [...whitelist]; // 返回副本以避免外部修改
+  } catch (error) {
+    console.error('Error getting whitelist:', error);
+    return [];
+  }
+}
+
+async function addToWhitelist(domain: string): Promise<{ success: boolean; message: string }> {
+  try {
+    if (!domain || typeof domain !== 'string') {
+      return { success: false, message: 'Invalid domain format' };
+    }
+
+    // 标准化域名
+    const normalizedDomain = normalizeDomain(domain);
+
+    if (!normalizedDomain) {
+      return { success: false, message: 'Invalid domain format' };
+    }
+
+    // 验证域名格式
+    if (!isValidDomain(normalizedDomain)) {
+      return { success: false, message: `Invalid domain: ${normalizedDomain}` };
+    }
+
+    // 检查是否已存在
+    if (whitelist.includes(normalizedDomain)) {
+      return { success: false, message: `Domain already in whitelist: ${normalizedDomain}` };
+    }
+
+    // 添加到白名单
+    whitelist.push(normalizedDomain);
+
+    // 保存到存储
+    await safeStorage.set({ whitelist });
+    console.log('Added to whitelist:', normalizedDomain);
+
+    return { success: true, message: `Added to whitelist: ${normalizedDomain}` };
+  } catch (error) {
+    console.error('Error adding to whitelist:', error);
+    return { success: false, message: 'Failed to add domain to whitelist' };
+  }
+}
+
+async function removeFromWhitelist(domain: string): Promise<{ success: boolean; message: string }> {
+  try {
+    if (!domain || typeof domain !== 'string') {
+      return { success: false, message: 'Invalid domain format' };
+    }
+
+    // 标准化域名
+    const normalizedDomain = normalizeDomain(domain);
+
+    if (!normalizedDomain) {
+      return { success: false, message: 'Invalid domain format' };
+    }
+
+    // 检查是否存在
+    const index = whitelist.indexOf(normalizedDomain);
+    if (index === -1) {
+      return { success: false, message: `Domain not found in whitelist: ${normalizedDomain}` };
+    }
+
+    // 从白名单移除
+    whitelist.splice(index, 1);
+
+    // 保存到存储
+    await safeStorage.set({ whitelist });
+    console.log('Removed from whitelist:', normalizedDomain);
+
+    return { success: true, message: `Removed from whitelist: ${normalizedDomain}` };
+  } catch (error) {
+    console.error('Error removing from whitelist:', error);
+    return { success: false, message: 'Failed to remove domain from whitelist' };
+  }
+}
+
 // 消息处理
 browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendResponse) => {
   const request = req as Message;
@@ -299,9 +463,37 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     saveFreeTab();
     sendResponse({ response: 'Tab removed from freeze list' });
   }
-  if (request.GetWhiteList) {
-    sendResponse({ response: whitelist});
+    // 新的白名单 CRUD 操作
+  if (request.GetWhitelist) {
+    getWhitelist().then(whitelistData => {
+      sendResponse({ response: whitelistData });
+    }).catch(error => {
+      console.error('Error getting whitelist:', error);
+      sendResponse({ response: [], error: 'Failed to get whitelist' });
+    });
+    return true; // 异步响应
   }
+
+  if (request.AddToWhitelist) {
+    addToWhitelist(request.AddToWhitelist).then(result => {
+      sendResponse({ response: result });
+    }).catch(error => {
+      console.error('Error adding to whitelist:', error);
+      sendResponse({ response: { success: false, message: 'Failed to add domain to whitelist' } });
+    });
+    return true; // 异步响应
+  }
+
+  if (request.RemoveFromWhitelist) {
+    removeFromWhitelist(request.RemoveFromWhitelist).then(result => {
+      sendResponse({ response: result });
+    }).catch(error => {
+      console.error('Error removing from whitelist:', error);
+      sendResponse({ response: { success: false, message: 'Failed to remove domain from whitelist' } });
+    });
+    return true; // 异步响应
+  }
+
   if (request.GotoTaskPage && request.data !== undefined) {
     browser.tabs.update(request.data as number, { active: true });
   }
@@ -340,10 +532,13 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
     case 'whitelist':
       if (tab.url) {
         const url = new URL(tab.url).hostname;
-        if (!whitelist.includes(url)) {
-          whitelist.push(url);
-          browser.storage.sync.set({ 'whitelist': whitelist });
-        }
+        addToWhitelist(url).then(result => {
+          if (result.success) {
+            console.log('Added from context menu:', result.message);
+          } else {
+            console.warn('Failed to add from context menu:', result.message);
+          }
+        });
       }
       break;
   }

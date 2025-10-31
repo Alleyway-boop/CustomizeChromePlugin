@@ -87,6 +87,48 @@ export function isValidTabId(tabId: number): boolean {
 }
 
 /**
+ * 验证域名格式
+ */
+export function isValidDomain(domain: string): boolean {
+  if (!domain || typeof domain !== 'string') {
+    return false;
+  }
+
+  // 移除可能的协议和路径
+  const cleanDomain = domain.replace(/^https?:\/\//, '').split('/')[0];
+
+  // 基本域名格式验证
+  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+  if (!domainRegex.test(cleanDomain)) {
+    return false;
+  }
+
+  // 长度检查
+  if (cleanDomain.length > 253) {
+    return false;
+  }
+
+  // 每个标签长度检查
+  const labels = cleanDomain.split('.');
+  return labels.every(label => label.length <= 63);
+}
+
+/**
+ * 标准化域名格式
+ */
+export function normalizeDomain(domain: string): string {
+  if (!domain) return '';
+
+  // 移除协议、端口和路径，只保留域名
+  let normalized = domain.replace(/^https?:\/\//, '').split('/')[0];
+  normalized = normalized.split(':')[0]; // 移除端口
+  normalized = normalized.toLowerCase().trim();
+
+  return normalized;
+}
+
+/**
  * 安全的存储操作
  */
 export const safeStorage = {
