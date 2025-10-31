@@ -22,6 +22,8 @@ interface Message {
   GetWhitelist?: boolean;
   AddToWhitelist?: string;
   RemoveFromWhitelist?: string;
+  // New restore all frozen tabs operation
+  RestoreAllFrozenTabs?: boolean;
 }
 
 interface TabStatus {

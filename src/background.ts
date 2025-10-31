@@ -252,6 +252,64 @@ async function FreezeTab(tabId: number) {
   }
 }
 
+// 恢复所有冻结的标签页
+async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: string; restoredCount: number }> {
+  try {
+    if (freezeTabStatusList.length === 0) {
+      return { success: true, message: 'No frozen tabs to restore', restoredCount: 0 };
+    }
+
+    let restoredCount = 0;
+
+    // 获取当前所有打开的标签页
+    const currentTabs = await browser.tabs.query({});
+    const currentTabIds = new Set(currentTabs.map(tab => tab.id));
+
+    // 遍历所有冻结的标签页并恢复
+    for (const frozenTab of [...freezeTabStatusList]) {
+      try {
+        // 检查标签页是否仍然存在
+        if (!currentTabIds.has(frozenTab.tabId)) {
+          freezeTabStatusList = freezeTabStatusList.filter(tab => tab.tabId !== frozenTab.tabId);
+          continue;
+        }
+
+        // 恢复标签页到原始URL
+        await browser.tabs.update(frozenTab.tabId, { url: frozenTab.url });
+
+        // 等待页面加载完成
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 将恢复的标签页添加回活跃列表
+        const restoredTab = await browser.tabs.get(frozenTab.tabId);
+        if (restoredTab) {
+          addTabToList(restoredTab);
+        }
+
+        // 从冻结列表中移除
+        freezeTabStatusList = freezeTabStatusList.filter(tab => tab.tabId !== frozenTab.tabId);
+        restoredCount++;
+
+      } catch (error) {
+        // 如果恢复失败，从冻结列表中移除以避免重复尝试
+        freezeTabStatusList = freezeTabStatusList.filter(tab => tab.tabId !== frozenTab.tabId);
+      }
+    }
+
+    // 保存更新后的冻结列表
+    await saveFreeTab();
+
+    const message = restoredCount > 0
+      ? `Successfully restored ${restoredCount} frozen tabs`
+      : 'No tabs were restored';
+
+    return { success: true, message, restoredCount };
+
+  } catch (error) {
+    return { success: false, message: 'Failed to restore frozen tabs', restoredCount: 0 };
+  }
+}
+
 // 检查和冻结标签页
 function checkAndFreezeTabs() {
   const now = Date.now();
@@ -462,6 +520,17 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     freezeTabStatusList = freezeTabStatusList.filter((tab) => tab.tabId !== request.RemoveFreezeTab);
     saveFreeTab();
     sendResponse({ response: 'Tab removed from freeze list' });
+  }
+
+  // 新增：恢复所有冻结的标签页
+  if (request.RestoreAllFrozenTabs) {
+    restoreAllFrozenTabs().then(result => {
+      sendResponse({ response: result });
+    }).catch(error => {
+      console.error('Error restoring all frozen tabs:', error);
+      sendResponse({ response: { success: false, message: 'Failed to restore frozen tabs' } });
+    });
+    return true; // 异步响应
   }
     // 新的白名单 CRUD 操作
   if (request.GetWhitelist) {

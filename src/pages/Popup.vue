@@ -1,233 +1,243 @@
 <template>
   <div class="flex flex-col gap-4 w-[380px] p-4 bg-gradient-to-br from-slate-50 to-blue-50/30 min-h-[500px]">
-      <!-- 头部标题 -->
-      <div
-        class="flex justify-between items-center p-3 bg-white/70 backdrop-blur-sm rounded-xl shadow-sm border border-white/20">
-        <div class="flex items-center gap-3">
-          <div
-            class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
-            <div class="i-carbon-dashboard text-white text-lg"></div>
-          </div>
-          <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">Tab
-            Manager</h1>
+    <!-- 头部标题 -->
+    <div
+      class="flex justify-between items-center p-3 bg-white/70 backdrop-blur-sm rounded-xl shadow-sm border border-white/20">
+      <div class="flex items-center gap-3">
+        <div
+          class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
+          <div class="i-carbon-dashboard text-white text-lg"></div>
         </div>
-        <div class="flex items-center gap-2 px-2 py-1 bg-amber-100/80 rounded-full">
-          <div class="i-carbon-warning-alt text-amber-600 text-sm animate-pulse"></div>
-          <span class="text-xs font-medium text-amber-700">Auto Freeze</span>
-        </div>
+        <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">Tab
+          Manager</h1>
       </div>
+      <div class="flex items-center gap-2 px-2 py-1 bg-amber-100/80 rounded-full">
+        <div class="i-carbon-warning-alt text-amber-600 text-sm animate-pulse"></div>
+        <span class="text-xs font-medium text-amber-700">Auto Freeze</span>
+      </div>
+    </div>
 
-      <!-- 标签页列表和设置区域 -->
-      <NScrollbar trigger="none" style="max-height: 400px;">
-        <NCollapse :accordion="true" class="gap-2">
-          <!-- 设置折叠面板 -->
-          <NCollapseItem title="Settings"
-            class="border-0 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden">
-            <div class="p-4">
-              <div class="flex flex-col gap-3">
-                <div class="flex items-center justify-between p-2 bg-gray-50/50 rounded-lg">
-                  <div class="flex items-center gap-2">
-                    <div class="i-carbon-time text-blue-500"></div>
-                    <span class="text-sm font-medium text-gray-700">Freeze Timer:</span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <NInputNumber v-model:value="FreezeTimeout" :min="1" :max="360" size="small"
-                      @update:value="SetFreezeTimeout()" class="w-20" />
-                    <span class="text-sm text-gray-600 font-medium">min</span>
-                  </div>
+    <!-- 标签页列表和设置区域 -->
+    <NScrollbar trigger="none" style="max-height: 400px;">
+      <NCollapse :accordion="true" class="gap-2">
+        <!-- 设置折叠面板 -->
+        <NCollapseItem title="Settings"
+          class="border-0 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden">
+          <div class="p-4">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between p-2 bg-gray-50/50 rounded-lg">
+                <div class="flex items-center gap-2">
+                  <div class="i-carbon-time text-blue-500"></div>
+                  <span class="text-sm font-medium text-gray-700">Freeze Timer:</span>
                 </div>
-                <div class="flex items-center justify-between p-2 bg-gray-50/50 rounded-lg">
-                  <div class="flex items-center gap-2">
-                    <div class="i-carbon-pin text-blue-500"></div>
-                    <span class="text-sm font-medium text-gray-700">Freeze Pinned:</span>
-                  </div>
-                  <NSwitch v-model:value="FreezePinned" @update:value="setFreezePinned()" />
+                <div class="flex items-center gap-2">
+                  <NInputNumber v-model:value="FreezeTimeout" :min="1" :max="360" size="small"
+                    @update:value="SetFreezeTimeout()" class="w-20" />
+                  <span class="text-sm text-gray-600 font-medium">min</span>
                 </div>
+              </div>
+              <div class="flex items-center justify-between p-2 bg-gray-50/50 rounded-lg">
+                <div class="flex items-center gap-2">
+                  <div class="i-carbon-pin text-blue-500"></div>
+                  <span class="text-sm font-medium text-gray-700">Freeze Pinned:</span>
+                </div>
+                <NSwitch v-model:value="FreezePinned" @update:value="setFreezePinned()" />
               </div>
             </div>
-          </NCollapseItem>
+          </div>
+        </NCollapseItem>
 
-          <!-- 活跃标签页 -->
-          <NCollapseItem title="Active Tabs"
-            class="border-0 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden">
-            <template #header-extra>
-              <div class="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full">
-                <div class="i-carbon-fire text-white text-sm animate-pulse"></div>
-                <span class="text-xs font-bold text-white">{{ TabStatusList.length }}</span>
+        <!-- 活跃标签页 -->
+        <NCollapseItem title="Active Tabs"
+          class="border-0 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden">
+          <template #header-extra>
+            <div class="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full">
+              <div class="i-carbon-fire text-white text-sm animate-pulse"></div>
+              <span class="text-xs font-bold text-white">{{ TabStatusList.length }}</span>
+            </div>
+          </template>
+
+          <div class="flex flex-col gap-2 p-3">
+            <div v-for="(item, index) in TabStatusList" :key="index" @click="GotoTab(item.tabId)"
+              class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg"
+              :class="{
+                'border-rose-200 bg-gradient-to-br from-rose-50 to-red-50 hover:border-rose-300 hover:shadow-rose-100/50': item.remainingMinutes <= 1,
+                'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 hover:border-amber-300 hover:shadow-amber-100/50': item.remainingMinutes <= 5,
+                'border-gray-200 bg-gradient-to-br from-white to-gray-50 hover:border-indigo-300 hover:shadow-indigo-100/50': item.remainingMinutes > 5
+              }">
+
+              <!-- 背景装饰 -->
+              <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" :class="{
+                'bg-gradient-to-r from-rose-500/5 to-red-500/5': item.remainingMinutes <= 1,
+                'bg-gradient-to-r from-amber-500/5 to-orange-500/5': item.remainingMinutes <= 5,
+                'bg-gradient-to-r from-indigo-500/5 to-blue-500/5': item.remainingMinutes > 5
+              }">
               </div>
-            </template>
 
-            <div class="flex flex-col gap-2 p-3">
-              <div v-for="(item, index) in TabStatusList" :key="index" @click="GotoTab(item.tabId)"
-                class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg"
-                :class="{
-                  'border-rose-200 bg-gradient-to-br from-rose-50 to-red-50 hover:border-rose-300 hover:shadow-rose-100/50': item.remainingMinutes <= 1,
-                  'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 hover:border-amber-300 hover:shadow-amber-100/50': item.remainingMinutes <= 5,
-                  'border-gray-200 bg-gradient-to-br from-white to-gray-50 hover:border-indigo-300 hover:shadow-indigo-100/50': item.remainingMinutes > 5
-                }">
-
-                <!-- 背景装饰 -->
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" :class="{
-                  'bg-gradient-to-r from-rose-500/5 to-red-500/5': item.remainingMinutes <= 1,
-                  'bg-gradient-to-r from-amber-500/5 to-orange-500/5': item.remainingMinutes <= 5,
-                  'bg-gradient-to-r from-indigo-500/5 to-blue-500/5': item.remainingMinutes > 5
-                }">
+              <div class="relative flex items-center gap-3 p-4">
+                <!-- 图标容器 -->
+                <div class="flex-shrink-0 relative">
+                  <div class="absolute inset-0 rounded-lg opacity-20 blur-sm" :class="{
+                    'bg-gradient-to-br from-rose-400 to-red-500': item.remainingMinutes <= 1,
+                    'bg-gradient-to-br from-amber-400 to-orange-500': item.remainingMinutes <= 5,
+                    'bg-gradient-to-br from-indigo-400 to-blue-500': item.remainingMinutes > 5
+                  }">
+                  </div>
+                  <div class="relative w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
+                    <img v-if="item.icon" :src="item.icon" class="w-6 h-6 rounded" />
+                    <div v-else class="i-carbon-document text-gray-400 text-lg"></div>
+                  </div>
                 </div>
 
-                <div class="relative flex items-center gap-3 p-4">
-                  <!-- 图标容器 -->
-                  <div class="flex-shrink-0 relative">
-                    <div class="absolute inset-0 rounded-lg opacity-20 blur-sm" :class="{
-                      'bg-gradient-to-br from-rose-400 to-red-500': item.remainingMinutes <= 1,
-                      'bg-gradient-to-br from-amber-400 to-orange-500': item.remainingMinutes <= 5,
-                      'bg-gradient-to-br from-indigo-400 to-blue-500': item.remainingMinutes > 5
-                    }">
-                    </div>
-                    <div class="relative w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm">
-                      <img v-if="item.icon" :src="item.icon" class="w-6 h-6 rounded" />
-                      <div v-else class="i-carbon-document text-gray-400 text-lg"></div>
-                    </div>
-                  </div>
-
-                  <!-- 内容 -->
-                  <div class="flex-1 min-w-0">
-                    <!-- 标题和时间 -->
-                    <div class="flex items-center justify-between mb-3">
-                      <h3
-                        class="font-semibold text-sm text-gray-900 truncate pr-2 group-hover:text-indigo-600 transition-colors">
-                        {{ item.title || 'Unknown Page' }}
-                      </h3>
-                      <div class="flex items-center gap-2 flex-shrink-0">
-                        <!-- 状态指示器 -->
-                        <div class="relative">
-                          <div class="absolute inset-0 rounded-full animate-ping opacity-20" :class="{
-                            'bg-rose-500': item.remainingMinutes <= 1,
-                            'bg-amber-500': item.remainingMinutes <= 5,
-                            'bg-emerald-500': item.remainingMinutes > 15,
-                            'bg-yellow-500': item.remainingMinutes > 5 && item.remainingMinutes <= 15
-                          }">
-                          </div>
-                          <div class="relative w-2 h-2 rounded-full" :class="{
-                            'bg-rose-500': item.remainingMinutes <= 1,
-                            'bg-amber-500': item.remainingMinutes <= 5,
-                            'bg-emerald-500': item.remainingMinutes > 15,
-                            'bg-yellow-500': item.remainingMinutes > 5 && item.remainingMinutes <= 15
-                          }">
-                          </div>
-                        </div>
-
-                        <span class="text-xs font-bold px-2 py-1 rounded-full" :class="{
-                          'bg-rose-100 text-rose-700 border border-rose-200': item.remainingMinutes <= 1,
-                          'bg-amber-100 text-amber-700 border border-amber-200': item.remainingMinutes <= 5,
-                          'bg-emerald-100 text-emerald-700 border border-emerald-200': item.remainingMinutes > 15,
-                          'bg-yellow-100 text-yellow-700 border border-yellow-200': item.remainingMinutes > 5 && item.remainingMinutes <= 15
+                <!-- 内容 -->
+                <div class="flex-1 min-w-0">
+                  <!-- 标题和时间 -->
+                  <div class="flex items-center justify-between mb-3">
+                    <h3
+                      class="font-semibold text-sm text-gray-900 truncate pr-2 group-hover:text-indigo-600 transition-colors">
+                      {{ item.title || 'Unknown Page' }}
+                    </h3>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                      <!-- 状态指示器 -->
+                      <div class="relative">
+                        <div class="absolute inset-0 rounded-full animate-ping opacity-20" :class="{
+                          'bg-rose-500': item.remainingMinutes <= 1,
+                          'bg-amber-500': item.remainingMinutes <= 5,
+                          'bg-emerald-500': item.remainingMinutes > 15,
+                          'bg-yellow-500': item.remainingMinutes > 5 && item.remainingMinutes <= 15
                         }">
-                          {{ formatRemainingTime(item.remainingMinutes) }}
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- 进度条和时间 -->
-                    <div class="flex items-center gap-3">
-                      <span class="text-xs text-gray-500 flex-shrink-0 font-medium">
-                        {{ new Date(item.lastUseTime).toLocaleTimeString('en-US', {
-                          hour: '2-digit', minute: '2-digit'
-                        })
-                        }}
-                      </span>
-                      <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner">
-                        <div class="h-full relative rounded-full transition-all duration-700 ease-out shadow-sm" :class="{
-                          'bg-gradient-to-r from-rose-400 to-red-500 animate-pulse': item.remainingMinutes <= 1,
-                          'bg-gradient-to-r from-amber-400 to-orange-500': item.remainingMinutes <= 5,
-                          'bg-gradient-to-r from-yellow-400 to-amber-500': item.remainingMinutes > 5 && item.remainingMinutes <= 15,
-                          'bg-gradient-to-r from-emerald-400 to-green-500': item.remainingMinutes > 15
-                        }" :style="{ width: Math.max(12, (item.remainingMinutes / (FreezeTimeout || 20)) * 100) + '%' }">
-                          <div class="absolute inset-0 bg-white/20 rounded-full animate-pulse"></div>
                         </div>
+                        <div class="relative w-2 h-2 rounded-full" :class="{
+                          'bg-rose-500': item.remainingMinutes <= 1,
+                          'bg-amber-500': item.remainingMinutes <= 5,
+                          'bg-emerald-500': item.remainingMinutes > 15,
+                          'bg-yellow-500': item.remainingMinutes > 5 && item.remainingMinutes <= 15
+                        }">
+                        </div>
+                      </div>
+
+                      <span class="text-xs font-bold px-2 py-1 rounded-full" :class="{
+                        'bg-rose-100 text-rose-700 border border-rose-200': item.remainingMinutes <= 1,
+                        'bg-amber-100 text-amber-700 border border-amber-200': item.remainingMinutes <= 5,
+                        'bg-emerald-100 text-emerald-700 border border-emerald-200': item.remainingMinutes > 15,
+                        'bg-yellow-100 text-yellow-700 border border-yellow-200': item.remainingMinutes > 5 && item.remainingMinutes <= 15
+                      }">
+                        {{ formatRemainingTime(item.remainingMinutes) }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <!-- 进度条和时间 -->
+                  <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-500 flex-shrink-0 font-medium">
+                      {{ new Date(item.lastUseTime).toLocaleTimeString('en-US', {
+                        hour: '2-digit', minute: '2-digit'
+                      })
+                      }}
+                    </span>
+                    <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                      <div class="h-full relative rounded-full transition-all duration-700 ease-out shadow-sm" :class="{
+                        'bg-gradient-to-r from-rose-400 to-red-500 animate-pulse': item.remainingMinutes <= 1,
+                        'bg-gradient-to-r from-amber-400 to-orange-500': item.remainingMinutes <= 5,
+                        'bg-gradient-to-r from-yellow-400 to-amber-500': item.remainingMinutes > 5 && item.remainingMinutes <= 15,
+                        'bg-gradient-to-r from-emerald-400 to-green-500': item.remainingMinutes > 15
+                      }" :style="{ width: Math.max(12, (item.remainingMinutes / (FreezeTimeout || 20)) * 100) + '%' }">
+                        <div class="absolute inset-0 bg-white/20 rounded-full animate-pulse"></div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </NCollapseItem>
+          </div>
+        </NCollapseItem>
 
-          <!-- 冻结标签页 -->
-          <NCollapseItem title="Frozen Tabs"
-            class="border-0 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden">
-            <template #header-extra>
+        <!-- 冻结标签页 -->
+        <NCollapseItem title="Frozen Tabs"
+          class="border-0 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden">
+          <template #header-extra>
+            <div class="flex items-center gap-2">
+              <!-- 恢复所有按钮 -->
+              <button v-if="freezeTabStatusList.length > 0" @click="restoreAllFrozenTabs"
+                class="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 text-white rounded-full transition-all duration-300 transform hover:scale-105 shadow-sm hover:shadow-md">
+                <div class="i-carbon-sun text-white text-xs"></div>
+                <span class="text-xs font-bold">Restore All</span>
+              </button>
+
+              <!-- 冻结计数 -->
               <div class="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full">
                 <div class="i-carbon-snowflake text-white text-sm"></div>
                 <span class="text-xs font-bold text-white">{{ freezeTabStatusList.length }}</span>
               </div>
-            </template>
+            </div>
+          </template>
 
-            <div class="flex flex-col gap-2 p-3">
-              <div v-for="(item, index) in freezeTabStatusList" :key="index" @click="GotoTab(item.tabId)"
-                class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 hover:border-cyan-300 hover:shadow-cyan-100/50">
+          <div class="flex flex-col gap-2 p-3">
+            <div v-for="(item, index) in freezeTabStatusList" :key="index" @click="GotoTab(item.tabId)"
+              class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 hover:border-cyan-300 hover:shadow-cyan-100/50">
 
-                <!-- 冰霜效果背景 -->
-                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                  <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-cyan-500/5"></div>
-                  <div
-                    class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2220%22 height=%2220%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cdefs%3E%3Cpattern id=%22snow%22 x=%220%22 y=%220%22 width=%2220%22 height=%2220%22 patternUnits=%22userSpaceOnUse%22%3E%3Ccircle cx=%222%22 cy=%222%22 r=%221%22 fill=%22white%22 opacity=%220.3%22/%3E%3Ccircle cx=%2212%22 cy=%228%22 r=%220.5%22 fill=%22white%22 opacity=%220.2%22/%3E%3Ccircle cx=%228%22 cy=%2214%22 r=%220.8%22 fill=%22white%22 opacity=%220.25%22/%3E%3C/pattern%3E%3C/defs%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22url(%23snow)%22/%3E%3C/svg%3E')] opacity-20">
-                  </div>
-                </div>
-
-                <div class="relative flex items-center gap-3 p-4">
-                  <!-- 图标容器 -->
-                  <div class="flex-shrink-0 relative">
-                    <div
-                      class="absolute inset-0 rounded-lg opacity-30 blur-sm bg-gradient-to-br from-blue-400 to-cyan-500">
-                    </div>
-                    <div
-                      class="relative w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm border border-blue-100">
-                      <img v-if="item.icon" :src="item.icon" class="w-6 h-6 rounded opacity-70" />
-                      <div v-else class="i-carbon-document text-blue-400 text-lg"></div>
-                    </div>
-                    <!-- 冻结徽章 -->
-                    <div
-                      class="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center shadow-sm">
-                      <div class="i-carbon-snowflake text-white text-[8px]"></div>
-                    </div>
-                  </div>
-
-                  <!-- 内容 -->
-                  <div class="flex-1 min-w-0">
-                    <h4
-                      class="font-semibold text-sm text-gray-900 truncate mb-1 group-hover:text-blue-600 transition-colors">
-                      {{ item.title }}
-                    </h4>
-                    <p class="text-xs text-gray-500 truncate mb-2">{{ item.url }}</p>
-
-                    <!-- 状态信息 -->
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-1 px-2 py-1 bg-blue-100/80 rounded-full">
-                        <div class="i-carbon-snowflake text-blue-600 text-xs"></div>
-                        <span class="text-xs font-medium text-blue-700">Frozen</span>
-                      </div>
-                      <div class="text-xs text-gray-400 font-medium">
-                        Inactive
-                      </div>
-                    </div>
-                  </div>
+              <!-- 冰霜效果背景 -->
+              <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div class="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-cyan-500/5"></div>
+                <div
+                  class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2220%22 height=%2220%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cdefs%3E%3Cpattern id=%22snow%22 x=%220%22 y=%220%22 width=%2220%22 height=%2220%22 patternUnits=%22userSpaceOnUse%22%3E%3Ccircle cx=%222%22 cy=%222%22 r=%221%22 fill=%22white%22 opacity=%220.3%22/%3E%3Ccircle cx=%2212%22 cy=%228%22 r=%220.5%22 fill=%22white%22 opacity=%220.2%22/%3E%3Ccircle cx=%228%22 cy=%2214%22 r=%220.8%22 fill=%22white%22 opacity=%220.25%22/%3E%3C/pattern%3E%3C/defs%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22url(%23snow)%22/%3E%3C/svg%3E')] opacity-20">
                 </div>
               </div>
 
-              <!-- 空状态提示 -->
-              <div v-if="freezeTabStatusList.length === 0"
-                class="flex flex-col items-center justify-center py-8 text-center">
-                <div
-                  class="w-16 h-16 bg-gradient-to-br from-blue-100 to-cyan-100 rounded-2xl flex items-center justify-center mb-3">
-                  <div class="i-carbon-snowflake text-blue-500 text-2xl"></div>
+              <div class="relative flex items-center gap-3 p-4">
+                <!-- 图标容器 -->
+                <div class="flex-shrink-0 relative">
+                  <div
+                    class="absolute inset-0 rounded-lg opacity-30 blur-sm bg-gradient-to-br from-blue-400 to-cyan-500">
+                  </div>
+                  <div
+                    class="relative w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm border border-blue-100">
+                    <img v-if="item.icon" :src="item.icon" class="w-6 h-6 rounded opacity-70" />
+                    <div v-else class="i-carbon-document text-blue-400 text-lg"></div>
+                  </div>
+                  <!-- 冻结徽章 -->
+                  <div
+                    class="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center shadow-sm">
+                    <div class="i-carbon-snowflake text-white text-[8px]"></div>
+                  </div>
                 </div>
-                <h3 class="text-sm font-semibold text-gray-700 mb-1">No Frozen Tabs</h3>
-                <p class="text-xs text-gray-500">Tabs will be frozen automatically when inactive</p>
+
+                <!-- 内容 -->
+                <div class="flex-1 min-w-0">
+                  <h4
+                    class="font-semibold text-sm text-gray-900 truncate mb-1 group-hover:text-blue-600 transition-colors">
+                    {{ item.title }}
+                  </h4>
+                  <p class="text-xs text-gray-500 truncate mb-2">{{ item.url }}</p>
+
+                  <!-- 状态信息 -->
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-1 px-2 py-1 bg-blue-100/80 rounded-full">
+                      <div class="i-carbon-snowflake text-blue-600 text-xs"></div>
+                      <span class="text-xs font-medium text-blue-700">Frozen</span>
+                    </div>
+                    <div class="text-xs text-gray-400 font-medium">
+                      Inactive
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </NCollapseItem>
-        </NCollapse>
-      </NScrollbar>
+
+            <!-- 空状态提示 -->
+            <div v-if="freezeTabStatusList.length === 0"
+              class="flex flex-col items-center justify-center py-8 text-center">
+              <div
+                class="w-16 h-16 bg-gradient-to-br from-blue-100 to-cyan-100 rounded-2xl flex items-center justify-center mb-3">
+                <div class="i-carbon-snowflake text-blue-500 text-2xl"></div>
+              </div>
+              <h3 class="text-sm font-semibold text-gray-700 mb-1">No Frozen Tabs</h3>
+              <p class="text-xs text-gray-500">Tabs will be frozen automatically when inactive</p>
+            </div>
+          </div>
+        </NCollapseItem>
+      </NCollapse>
+    </NScrollbar>
   </div>
 </template>
 
@@ -355,6 +365,69 @@ const GetFreezeTabList = () => {
   browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: any) => {
     freezeTabStatusList.value = response.response;
   });
+};
+
+// 恢复所有冻结的标签页
+const restoreAllFrozenTabs = async () => {
+  try {
+    const response: any = await browser.runtime.sendMessage({ RestoreAllFrozenTabs: true });
+
+    if (response && response.response) {
+      const result = response.response;
+
+      if (result.success) {
+        // 更新冻结列表
+        await GetFreezeTabList();
+        await GetAllTabStatusList();
+
+        // 显示成功通知
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all duration-300';
+        notification.textContent = `Restored ${result.restoredCount} tabs`;
+        document.body.appendChild(notification);
+
+        // 3秒后移除通知
+        setTimeout(() => {
+          notification.style.opacity = '0';
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 300);
+        }, 3000);
+      } else {
+        // 显示错误提示
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all duration-300';
+        notification.textContent = result.message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          notification.style.opacity = '0';
+          setTimeout(() => {
+            if (notification.parentNode) {
+              notification.parentNode.removeChild(notification);
+            }
+          }, 300);
+        }, 3000);
+      }
+    }
+  } catch (error) {
+    // 显示错误通知
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all duration-300';
+    notification.textContent = 'Failed to restore frozen tabs';
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.parentNode.removeChild(notification);
+        }
+      }, 300);
+    }, 3000);
+  }
 };
 
 
