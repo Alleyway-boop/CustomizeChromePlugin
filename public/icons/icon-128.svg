@@ -1,0 +1,93 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 渐变定义 -->
+    <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7C3AED;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6D28D9;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="lightPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="darkShadow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4C1D95;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5B21B6;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- 阴影滤镜 -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="2" dy="4" result="offsetblur"/>
+      <feFlood flood-color="#4C1D95" flood-opacity="0.3"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="innerShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="-1" dy="-1" result="offsetblur"/>
+      <feFlood flood-color="#A78BFA" flood-opacity="0.5"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 背景圆形 -->
+  <circle cx="64" cy="64" r="58" fill="url(#purpleGradient)" filter="url(#shadow)"/>
+
+  <!-- 内部高光圆形 -->
+  <circle cx="64" cy="64" r="54" fill="url(#lightPurple)" filter="url(#innerShadow)"/>
+
+  <!-- 浏览器窗口主体 -->
+  <rect x="20" y="25" width="88" height="65" rx="8" ry="8"
+        fill="#ffffff" opacity="0.95" filter="url(#shadow)"/>
+
+  <!-- 浏览器顶部栏 -->
+  <rect x="20" y="25" width="88" height="18" rx="8" ry="8"
+        fill="url(#darkShadow)" opacity="0.8"/>
+
+  <!-- 浏览器控制按钮 -->
+  <circle cx="30" cy="34" r="3" fill="#EF4444"/>
+  <circle cx="40" cy="34" r="3" fill="#F59E0B"/>
+  <circle cx="50" cy="34" r="3" fill="#10B981"/>
+
+  <!-- 标签页分隔线 -->
+  <rect x="28" y="47" width="72" height="2" fill="url(#purpleGradient)" opacity="0.6"/>
+
+  <!-- 冻结的雪花符号 -->
+  <g transform="translate(64, 60)">
+    <!-- 雪花主体 -->
+    <path d="M 0,-12 L 0,12 M -12,0 L 12,0 M -8.5,-8.5 L 8.5,8.5 M -8.5,8.5 L 8.5,-8.5"
+          stroke="url(#purpleGradient)" stroke-width="3" stroke-linecap="round" filter="url(#shadow)"/>
+
+    <!-- 雪花装饰点 -->
+    <circle cx="0" cy="-12" r="2" fill="url(#purpleGradient)"/>
+    <circle cx="0" cy="12" r="2" fill="url(#purpleGradient)"/>
+    <circle cx="-12" cy="0" r="2" fill="url(#purpleGradient)"/>
+    <circle cx="12" cy="0" r="2" fill="url(#purpleGradient)"/>
+    <circle cx="-8.5" cy="-8.5" r="1.5" fill="url(#purpleGradient)"/>
+    <circle cx="8.5" cy="8.5" r="1.5" fill="url(#purpleGradient)"/>
+    <circle cx="-8.5" cy="8.5" r="1.5" fill="url(#purpleGradient)"/>
+    <circle cx="8.5" cy="-8.5" r="1.5" fill="url(#purpleGradient)"/>
+  </g>
+
+  <!-- 底部控制面板 -->
+  <rect x="25" y="80" width="78" height="8" rx="4" ry="4"
+        fill="url(#purpleGradient)" opacity="0.7" filter="url(#shadow)"/>
+
+  <!-- 暂停按钮指示器 -->
+  <rect x="58" y="82" width="3" height="4" rx="1" fill="#ffffff" opacity="0.9"/>
+  <rect x="63" y="82" width="3" height="4" rx="1" fill="#ffffff" opacity="0.9"/>
+
+  <!-- 高光效果 -->
+  <ellipse cx="45" cy="40" rx="15" ry="8" fill="#ffffff" opacity="0.3"/>
+</svg>

@@ -1,0 +1,71 @@
+<svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="purpleGradient48" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#7C3AED;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6D28D9;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="lightPurple48" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#A78BFA;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="darkShadow48" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4C1D95;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5B21B6;stop-opacity:1" />
+    </linearGradient>
+
+    <filter id="shadow48" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+      <feOffset dx="1" dy="2" result="offsetblur"/>
+      <feFlood flood-color="#4C1D95" flood-opacity="0.4"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 背景圆形 -->
+  <circle cx="24" cy="24" r="22" fill="url(#purpleGradient48)" filter="url(#shadow48)"/>
+
+  <!-- 内部高光 -->
+  <circle cx="24" cy="24" r="20" fill="url(#lightPurple48)"/>
+
+  <!-- 浏览器窗口 -->
+  <rect x="8" y="10" width="32" height="23" rx="3" ry="3"
+        fill="#ffffff" opacity="0.95" filter="url(#shadow48)"/>
+
+  <!-- 浏览器顶部栏 -->
+  <rect x="8" y="10" width="32" height="6" rx="3" ry="3"
+        fill="url(#darkShadow48)" opacity="0.8"/>
+
+  <!-- 控制按钮 -->
+  <circle cx="11" cy="13" r="1.5" fill="#EF4444"/>
+  <circle cx="15" cy="13" r="1.5" fill="#F59E0B"/>
+  <circle cx="19" cy="13" r="1.5" fill="#10B981"/>
+
+  <!-- 标签分隔线 -->
+  <rect x="11" y="19" width="26" height="1" fill="url(#purpleGradient48)" opacity="0.6"/>
+
+  <!-- 雪花符号 -->
+  <g transform="translate(24, 24)">
+    <path d="M 0,-6 L 0,6 M -6,0 L 6,0 M -4.2,-4.2 L 4.2,4.2 M -4.2,4.2 L 4.2,-4.2"
+          stroke="url(#purpleGradient48)" stroke-width="1.5" stroke-linecap="round"/>
+
+    <!-- 雪花点 -->
+    <circle cx="0" cy="-6" r="1" fill="url(#purpleGradient48)"/>
+    <circle cx="0" cy="6" r="1" fill="url(#purpleGradient48)"/>
+    <circle cx="-6" cy="0" r="1" fill="url(#purpleGradient48)"/>
+    <circle cx="6" cy="0" r="1" fill="url(#purpleGradient48)"/>
+  </g>
+
+  <!-- 暂停指示器 -->
+  <rect x="21" y="30" width="1.5" height="2" rx="0.5" fill="#ffffff" opacity="0.9"/>
+  <rect x="23.5" y="30" width="1.5" height="2" rx="0.5" fill="#ffffff" opacity="0.9"/>
+
+  <!-- 高光 -->
+  <ellipse cx="17" cy="16" rx="6" ry="3" fill="#ffffff" opacity="0.3"/>
+</svg>
