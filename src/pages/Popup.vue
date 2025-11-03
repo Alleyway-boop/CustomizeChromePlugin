@@ -61,15 +61,17 @@
             <div v-for="(item, index) in TabStatusList" :key="index" @click="GotoTab(item.tabId)"
               class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg"
               :class="{
-                'border-rose-200 bg-gradient-to-br from-rose-50 to-red-50 hover:border-rose-300 hover:shadow-rose-100/50': item.remainingMinutes <= 1,
-                'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 hover:border-amber-300 hover:shadow-amber-100/50': item.remainingMinutes <= 5,
+                'border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50 hover:border-sky-300 hover:shadow-sky-100/50': item.remainingMinutes === -1,
+                'border-rose-200 bg-gradient-to-br from-rose-50 to-red-50 hover:border-rose-300 hover:shadow-rose-100/50': item.remainingMinutes <= 1 && item.remainingMinutes !== -1,
+                'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 hover:border-amber-300 hover:shadow-amber-100/50': item.remainingMinutes <= 5 && item.remainingMinutes > 1,
                 'border-gray-200 bg-gradient-to-br from-white to-gray-50 hover:border-indigo-300 hover:shadow-indigo-100/50': item.remainingMinutes > 5
               }">
 
               <!-- 背景装饰 -->
               <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" :class="{
-                'bg-gradient-to-r from-rose-500/5 to-red-500/5': item.remainingMinutes <= 1,
-                'bg-gradient-to-r from-amber-500/5 to-orange-500/5': item.remainingMinutes <= 5,
+                'bg-gradient-to-r from-sky-500/5 to-blue-500/5': item.remainingMinutes === -1,
+                'bg-gradient-to-r from-rose-500/5 to-red-500/5': item.remainingMinutes <= 1 && item.remainingMinutes !== -1,
+                'bg-gradient-to-r from-amber-500/5 to-orange-500/5': item.remainingMinutes <= 5 && item.remainingMinutes > 1,
                 'bg-gradient-to-r from-indigo-500/5 to-blue-500/5': item.remainingMinutes > 5
               }">
               </div>
@@ -78,8 +80,9 @@
                 <!-- 图标容器 -->
                 <div class="flex-shrink-0 relative">
                   <div class="absolute inset-0 rounded-lg opacity-20 blur-sm" :class="{
-                    'bg-gradient-to-br from-rose-400 to-red-500': item.remainingMinutes <= 1,
-                    'bg-gradient-to-br from-amber-400 to-orange-500': item.remainingMinutes <= 5,
+                    'bg-gradient-to-br from-sky-400 to-blue-500': item.remainingMinutes === -1,
+                    'bg-gradient-to-br from-rose-400 to-red-500': item.remainingMinutes <= 1 && item.remainingMinutes !== -1,
+                    'bg-gradient-to-br from-amber-400 to-orange-500': item.remainingMinutes <= 5 && item.remainingMinutes > 1,
                     'bg-gradient-to-br from-indigo-400 to-blue-500': item.remainingMinutes > 5
                   }">
                   </div>
@@ -100,29 +103,38 @@
                     <div class="flex items-center gap-2 flex-shrink-0">
                       <!-- 状态指示器 -->
                       <div class="relative">
-                        <div class="absolute inset-0 rounded-full animate-ping opacity-20" :class="{
-                          'bg-rose-500': item.remainingMinutes <= 1,
-                          'bg-amber-500': item.remainingMinutes <= 5,
+                        <div class="absolute inset-0 rounded-full animate-pulse opacity-30" :class="{
+                          'bg-sky-500': item.remainingMinutes === -1,
+                          'bg-rose-500': item.remainingMinutes <= 1 && item.remainingMinutes !== -1,
+                          'bg-amber-500': item.remainingMinutes <= 5 && item.remainingMinutes > 1,
                           'bg-emerald-500': item.remainingMinutes > 15,
                           'bg-yellow-500': item.remainingMinutes > 5 && item.remainingMinutes <= 15
                         }">
                         </div>
                         <div class="relative w-2 h-2 rounded-full" :class="{
-                          'bg-rose-500': item.remainingMinutes <= 1,
-                          'bg-amber-500': item.remainingMinutes <= 5,
+                          'bg-sky-500': item.remainingMinutes === -1,
+                          'bg-rose-500': item.remainingMinutes <= 1 && item.remainingMinutes !== -1,
+                          'bg-amber-500': item.remainingMinutes <= 5 && item.remainingMinutes > 1,
                           'bg-emerald-500': item.remainingMinutes > 15,
                           'bg-yellow-500': item.remainingMinutes > 5 && item.remainingMinutes <= 15
                         }">
                         </div>
                       </div>
 
-                      <span class="text-xs font-bold px-2 py-1 rounded-full" :class="{
-                        'bg-rose-100 text-rose-700 border border-rose-200': item.remainingMinutes <= 1,
-                        'bg-amber-100 text-amber-700 border border-amber-200': item.remainingMinutes <= 5,
+                      <span class="text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1" :class="{
+                        'bg-sky-100 text-sky-700 border border-sky-200': item.remainingMinutes === -1,
+                        'bg-rose-100 text-rose-700 border border-rose-200': item.remainingMinutes <= 1 && item.remainingMinutes !== -1,
+                        'bg-amber-100 text-amber-700 border border-amber-200': item.remainingMinutes <= 5 && item.remainingMinutes > 1,
                         'bg-emerald-100 text-emerald-700 border border-emerald-200': item.remainingMinutes > 15,
                         'bg-yellow-100 text-yellow-700 border border-yellow-200': item.remainingMinutes > 5 && item.remainingMinutes <= 15
                       }">
-                        {{ formatRemainingTime(item.remainingMinutes) }}
+                        <span v-if="item.remainingMinutes === -1" class="inline-flex items-center gap-1">
+                          <div class="w-2 h-2 bg-sky-500 rounded-full animate-pulse"></div>
+                          {{ formatRemainingTime(item.remainingMinutes) }}
+                        </span>
+                        <span v-else>
+                          {{ formatRemainingTime(item.remainingMinutes) }}
+                        </span>
                       </span>
                     </div>
                   </div>
@@ -135,7 +147,14 @@
                       })
                       }}
                     </span>
-                    <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                    <!-- 活动状态时显示活动指示器，否则显示进度条 -->
+                    <div v-if="item.remainingMinutes === -1" class="flex-1 flex items-center justify-center">
+                      <div class="flex items-center gap-2 text-sky-600">
+                        <div class="w-3 h-3 bg-sky-500 rounded-full animate-pulse"></div>
+                        <span class="text-xs font-medium">Active</span>
+                      </div>
+                    </div>
+                    <div v-else class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner">
                       <div class="h-full relative rounded-full transition-all duration-700 ease-out shadow-sm" :class="{
                         'bg-gradient-to-r from-rose-400 to-red-500 animate-pulse': item.remainingMinutes <= 1,
                         'bg-gradient-to-r from-amber-400 to-orange-500': item.remainingMinutes <= 5,
@@ -257,9 +276,14 @@ const FreezeTimeout = ref<number>();
 const TabStatusList = ref<ExtendedTabStatus[]>([]);
 const freezeTabStatusList = ref<FreezeTabStatus[]>([]);
 let updateTimer: number | null = null;
+let lastTabStatusHash: string = ''; // 用于检测状态变化
+let updateInterval = 3000; // 默认更新间隔
+let noChangeCount = 0; // 连续无变化次数计数器
 
 // 格式化剩余时间显示
 function formatRemainingTime(minutes: number): string {
+  // 特殊值 -1 表示活动状态
+  if (minutes === -1) return '活动中';
   if (minutes <= 0) return '即将冻结';
   if (minutes < 1) return '1分钟内';
   if (minutes < 60) return `${minutes}分钟`;
@@ -277,27 +301,88 @@ function formatRemainingTime(minutes: number): string {
 
 // 获取时间状态的颜色
 function getTimeStatusColor(minutes: number): string {
+  if (minutes === -1) return '#0ea5e9'; // 天蓝色：活动中
   if (minutes <= 1) return '#dc2626'; // 红色：即将冻结
   if (minutes <= 5) return '#ea580c'; // 橙色：警告
   if (minutes <= 15) return '#ca8a04'; // 黄色：注意
   return '#16a34a'; // 绿色：安全
 }
 
-// 更新标签页时间信息
+// 计算标签页状态的哈希值，用于检测变化
+function calculateTabStatusHash(tabList: ExtendedTabStatus[]): string {
+  const hashData = tabList.map(tab => ({
+    id: tab.tabId,
+    active: tab.remainingMinutes === -1,
+    time: Math.floor(tab.remainingMinutes / 10) * 10 // 精确到10秒，避免频繁变化
+  }));
+  return JSON.stringify(hashData);
+}
+
+// 智能更新标签页时间信息
 function updateTabTimes() {
   browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: any) => {
     if (response && response.response) {
-      TabStatusList.value = response.response as ExtendedTabStatus[];
+      const newTabList = response.response as ExtendedTabStatus[];
+      const currentHash = calculateTabStatusHash(newTabList);
+
+      // 检测状态是否发生变化
+      if (currentHash !== lastTabStatusHash) {
+        console.log('Tab status changed, updating UI');
+        TabStatusList.value = newTabList;
+        lastTabStatusHash = currentHash;
+
+        // 状态发生变化，重置计数器并加快更新频率
+        noChangeCount = 0;
+        if (updateInterval > 1000) {
+          updateInterval = 1000; // 变化时每秒更新一次
+          restartUpdateTimer();
+        }
+      } else {
+        noChangeCount++;
+
+        // 连续无变化时降低更新频率
+        if (noChangeCount >= 5 && updateInterval < 10000) {
+          updateInterval = Math.min(updateInterval * 2, 10000); // 最多10秒更新一次
+          restartUpdateTimer();
+          console.log(`No tab status changes for ${noChangeCount} updates, slowing down to ${updateInterval}ms`);
+        }
+      }
     }
   }).catch((error) => {
     console.error('Error updating tab times:', error);
   });
 }
 
-// 启动实时更新
+// 重启更新定时器
+function restartUpdateTimer() {
+  if (updateTimer) {
+    clearInterval(updateTimer);
+  }
+  updateTimer = setInterval(updateTabTimes, updateInterval);
+}
+
+// 启动智能实时更新
 function startRealTimeUpdates() {
   updateTabTimes();
-  updateTimer = setInterval(updateTabTimes, 30000); // 每30秒更新一次
+
+  // 初始化快速更新阶段
+  updateInterval = 500; // 初始快速更新
+  restartUpdateTimer();
+
+  // 快速更新阶段后恢复正常频率
+  let fastUpdateCount = 0;
+  const fastUpdateTimer = setInterval(() => {
+    updateTabTimes();
+    fastUpdateCount++;
+
+    // 快速更新10次后切换到智能更新模式
+    if (fastUpdateCount >= 10) {
+      clearInterval(fastUpdateTimer);
+      updateInterval = 1000; // 正常开始时每秒更新一次
+      restartUpdateTimer();
+      console.log('Fast update phase completed, switching to intelligent updates');
+    }
+  }, 500);
 }
 
 // 停止实时更新
@@ -448,10 +533,33 @@ onMounted(async () => {
       console.error('Error getting freezeTabStatusList:', error);
     });
   }, 1000);
-});
 
-onUnmounted(() => {
-  stopRealTimeUpdates();
+  // 监听窗口获得焦点事件，立即更新状态
+  const handleFocus = () => {
+    console.log('Popup window gained focus, updating tab status');
+    updateTabTimes();
+  };
+
+  // 监听窗口可见性变化
+  const handleVisibilityChange = () => {
+    if (!document.hidden) {
+      console.log('Popup window became visible, updating tab status');
+      updateTabTimes();
+    }
+  };
+
+  // 添加事件监听器
+  window.addEventListener('focus', handleFocus);
+  window.addEventListener('visibilitychange', handleVisibilityChange);
+  document.addEventListener('mouseenter', handleFocus); // 鼠标进入时也更新
+
+  // 清理函数
+  onUnmounted(() => {
+    window.removeEventListener('focus', handleFocus);
+    window.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.removeEventListener('mouseenter', handleFocus);
+    stopRealTimeUpdates();
+  });
 });
 </script>
 

@@ -18,6 +18,8 @@ interface TabStatus {
   lastUseTime: number;
   windowId?: number;
   active?: boolean;
+  isVisible?: boolean; // 页面是否真正可见（基于Page Visibility API）
+  visibilityState?: 'visible' | 'hidden' | 'prerender' | 'unloaded';
 }
 
 interface FreezeTabStatus {
@@ -140,10 +142,10 @@ function addTabToList(tab: browser.Tabs.Tab) {
   if (tab.id === undefined) return;
   if (tab.pinned && !FreezePinned.value) return;
   if (!tab.url?.startsWith('http')) return;
-  
+
   const existingTab = tabStatusList.find(item => item.tabId === tab.id);
   if (existingTab) return;
-  
+
   const newTab: TabStatus = {
     tabId: tab.id,
     url: tab.url || '',
@@ -151,7 +153,9 @@ function addTabToList(tab: browser.Tabs.Tab) {
     title: tab.title || '',
     lastUseTime: Date.now(),
     windowId: tab.windowId,
-    active: tab.active
+    active: tab.active,
+    isVisible: tab.active, // 新创建的标签页，active为true时初始为可见
+    visibilityState: tab.active ? 'visible' : 'hidden'
   };
   tabStatusList.push(newTab);
   console.log('New tab added:', newTab);
@@ -167,6 +171,7 @@ function updateTabInList(tab: browser.Tabs.Tab) {
     existingTab.title = tab.title || '';
     existingTab.windowId = tab.windowId;
     existingTab.active = tab.active;
+    // 注意：不在这里直接更新可见性状态，让content script通过Page Visibility API来管理
     console.log('Tab updated:', existingTab);
   } else {
     addTabToList(tab);
@@ -325,10 +330,33 @@ function checkAndFreezeTabs() {
   });
 }
 
+// 获取当前窗口的活动标签页ID
+async function getCurrentActiveTabId(): Promise<number | null> {
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    return tabs.length > 0 && tabs[0].id ? tabs[0].id : null;
+  } catch (error) {
+    console.error('Error getting current active tab:', error);
+    return null;
+  }
+}
+
 // 计算标签页剩余冻结时间（分钟）
-function calculateRemainingTime(tabId: number): number {
+async function calculateRemainingTime(tabId: number): Promise<number> {
   const tab = tabStatusList.find(item => item.tabId === tabId);
   if (!tab) return 0;
+
+  // 基于页面可见性判断是否为活动状态
+  // 只有真正可见的页面才被视为活动状态
+  if (tab.isVisible === true && tab.visibilityState === 'visible') {
+    return -1; // 特殊值表示活动状态
+  }
+
+  // 如果可见性信息不可用，回退到原来的活动标签页检测
+  const activeTabId = await getCurrentActiveTabId();
+  if (tabId === activeTabId) {
+    return -1;
+  }
 
   const now = Date.now();
   const elapsed = now - tab.lastUseTime;
@@ -339,17 +367,19 @@ function calculateRemainingTime(tabId: number): number {
 }
 
 // 获取所有标签页的剩余时间信息
-function getAllTabsRemainingTime() {
-  return tabStatusList.map(tab => ({
+async function getAllTabsRemainingTime() {
+  const tabPromises = tabStatusList.map(async tab => ({
     tabId: tab.tabId,
     title: tab.title,
     url: tab.url,
     icon: tab.icon,
     windowId: tab.windowId,
     active: tab.active,
-    remainingMinutes: calculateRemainingTime(tab.tabId),
+    remainingMinutes: await calculateRemainingTime(tab.tabId),
     lastUseTime: tab.lastUseTime
   }));
+
+  return await Promise.all(tabPromises);
 }
 
 // 辅助函数
@@ -507,11 +537,22 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     }
   }
   if (request.GetTabStatusList) {
-    sendResponse({ response: getAllTabsRemainingTime() });
+    getAllTabsRemainingTime().then(result => {
+      sendResponse({ response: result });
+    }).catch(error => {
+      console.error('Error getting tab status list:', error);
+      sendResponse({ response: [], error: 'Failed to get tab status' });
+    });
+    return true; // 异步响应
   }
   if (request.GetRemainingTime) {
-    const remainingTime = calculateRemainingTime(request.tabId as number);
-    sendResponse({ response: remainingTime });
+    calculateRemainingTime(request.tabId as number).then(remainingTime => {
+      sendResponse({ response: remainingTime });
+    }).catch(error => {
+      console.error('Error getting remaining time:', error);
+      sendResponse({ response: 0, error: 'Failed to get remaining time' });
+    });
+    return true; // 异步响应
   }
   if (request.GetFreezeTabList) {
     sendResponse({ response: freezeTabStatusList });
@@ -566,6 +607,33 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
   if (request.GotoTaskPage && request.data !== undefined) {
     browser.tabs.update(request.data as number, { active: true });
   }
+
+  // 处理页面可见性变化
+  if (request.SetPageVisible && sender.tab?.id) {
+    const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
+    if (tabStatus) {
+      tabStatus.isVisible = true;
+      tabStatus.visibilityState = 'visible';
+      tabStatus.lastUseTime = Date.now(); // 页面可见时更新使用时间
+      console.log('Page became visible:', { tabId: sender.tab!.id, url: tabStatus.url });
+    }
+  }
+
+  if (request.SetPageHidden && sender.tab?.id) {
+    const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
+    if (tabStatus) {
+      tabStatus.isVisible = false;
+      tabStatus.visibilityState = 'hidden';
+      console.log('Page became hidden:', { tabId: sender.tab!.id, url: tabStatus.url });
+    }
+  }
+
+  if (request.GetVisibleTabs) {
+    const visibleTabs = tabStatusList.filter(tab => tab.isVisible === true && tab.visibilityState === 'visible');
+    sendResponse({ response: visibleTabs.map(tab => tab.tabId) });
+    return true;
+  }
+
   return true;
 });
 

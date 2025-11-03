@@ -24,6 +24,10 @@ interface Message {
   RemoveFromWhitelist?: string;
   // New restore all frozen tabs operation
   RestoreAllFrozenTabs?: boolean;
+  // New page visibility operations
+  SetPageVisible?: boolean;
+  SetPageHidden?: boolean;
+  GetVisibleTabs?: boolean;
 }
 
 interface TabStatus {
@@ -34,6 +38,8 @@ interface TabStatus {
   lastUseTime: number;
   windowId?: number;
   active?: boolean;
+  isVisible?: boolean; // 页面是否真正可见（基于Page Visibility API）
+  visibilityState?: 'visible' | 'hidden' | 'prerender' | 'unloaded';
 }
 
 interface FreezeTabStatus {
@@ -43,7 +49,7 @@ interface FreezeTabStatus {
   title: string;
 }
 interface Response {
-  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | { url?: string; title?: string } | { success: boolean; message: string };
+  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | { url?: string; title?: string } | { success: boolean; message: string } | number[];
   tabId?: number;
   error?: string;
 }

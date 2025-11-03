@@ -5,6 +5,10 @@ import { SendResponse, Response, Message } from './utils/index';
 let currentTabId: number | null = null;
 let lastUrl: string = window.location.href;
 
+// 页面可见性状态管理
+let currentVisibilityState: string = document.visibilityState;
+let lastVisibilityReport: string = currentVisibilityState;
+
 // 通知 background script 页面信息更新
 function notifyPageUpdate() {
     if (!currentTabId) return;
@@ -28,6 +32,43 @@ function notifyPageUpdate() {
     }
 }
 
+// 通知 background script 页面可见性变化
+function notifyVisibilityChange() {
+    if (!currentTabId) return;
+
+    const newVisibilityState = document.visibilityState;
+    currentVisibilityState = newVisibilityState;
+
+    // 防止重复报告相同的可见性状态
+    if (newVisibilityState === lastVisibilityReport) {
+        return;
+    }
+    lastVisibilityReport = newVisibilityState;
+
+    console.log('Visibility state changed:', {
+        tabId: currentTabId,
+        visibilityState: newVisibilityState,
+        url: window.location.href
+    });
+
+    let message: Message;
+
+    if (newVisibilityState === 'visible') {
+        message = { SetPageVisible: true };
+        // 页面变为可见时，更新最后使用时间
+        browser.runtime.sendMessage({ UpDateLastUseTime: true }).catch(() => {
+            // 忽略错误
+        });
+    } else {
+        message = { SetPageHidden: true };
+    }
+
+    browser.runtime.sendMessage(message).catch((error) => {
+        // 忽略错误（可能扩展已卸载）
+        console.warn('Failed to report visibility change:', error);
+    });
+}
+
 // init content script
 browser.runtime.sendMessage({ getTabId: true }).then((tabId) => {
     currentTabId = tabId as number;
@@ -35,9 +76,37 @@ browser.runtime.sendMessage({ getTabId: true }).then((tabId) => {
     // 初始化页面信息
     setTimeout(() => {
         notifyPageUpdate();
+        // 初始报告页面可见性状态
+        notifyVisibilityChange();
     }, 1000);
 }).catch(() => {
     // 忽略错误
+});
+
+// 添加 Page Visibility API 监听器
+document.addEventListener('visibilitychange', () => {
+    console.log('Document visibility changed to:', document.visibilityState);
+    notifyVisibilityChange();
+});
+
+// 监听页面焦点变化
+window.addEventListener('focus', () => {
+    console.log('Window gained focus');
+    // 确保页面状态为可见
+    if (document.visibilityState !== 'visible') {
+        // 如果document.visibilityState不是visible，但我们获得了焦点，可能需要强制更新
+        setTimeout(() => {
+            notifyVisibilityChange();
+        }, 100);
+    }
+});
+
+window.addEventListener('blur', () => {
+    console.log('Window lost focus');
+    // 窗口失去焦点时，检查是否变为隐藏
+    setTimeout(() => {
+        notifyVisibilityChange();
+    }, 100);
 });
 
 // 监听来自 background script 的消息
