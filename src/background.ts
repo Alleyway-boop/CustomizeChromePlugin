@@ -198,7 +198,54 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   console.log('Tab updated:', tabId, changeInfo, tab);
   if (tab.url) updateTabInList(tab);
 });
+
+// 监听标签页激活事件，重置倒计时
+browser.tabs.onActivated.addListener(async (activeInfo) => {
+  const tab = await browser.tabs.get(activeInfo.tabId);
+  if (tab.id && tab.url) {
+    const tabStatus = tabStatusList.find(item => item.tabId === tab.id);
+    if (tabStatus) {
+      const oldTime = tabStatus.lastUseTime;
+      tabStatus.lastUseTime = Date.now();
+      console.log(`Reset countdown due to tab activation for tab ${tab.id}:`, {
+        url: tab.url,
+        title: tab.title,
+        oldTime: new Date(oldTime).toLocaleTimeString(),
+        newTime: new Date(tabStatus.lastUseTime).toLocaleTimeString()
+      });
+    } else {
+      addTabToList(tab);
+    }
+  }
+});
+
 browser.tabs.onRemoved.addListener(removeTabFromList);
+
+// 监听窗口焦点变化，重置活动标签页倒计时
+browser.windows.onFocusChanged.addListener(async (windowId) => {
+  if (windowId === browser.windows.WINDOW_ID_NONE) return; // 忽略失去焦点的情况
+
+  try {
+    const tabs = await browser.tabs.query({ active: true, windowId });
+    if (tabs.length > 0 && tabs[0].id) {
+      const tab = tabs[0];
+      const tabStatus = tabStatusList.find(item => item.tabId === tab.id);
+      if (tabStatus) {
+        const oldTime = tabStatus.lastUseTime;
+        tabStatus.lastUseTime = Date.now();
+        console.log(`Reset countdown due to window focus for tab ${tab.id}:`, {
+          url: tab.url,
+          title: tab.title,
+          windowId,
+          oldTime: new Date(oldTime).toLocaleTimeString(),
+          newTime: new Date(tabStatus.lastUseTime).toLocaleTimeString()
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error handling window focus change:', error);
+  }
+});
 
 // 初始化时获取所有已打开的标签页
 browser.tabs.query({}).then(tabs => {
@@ -316,18 +363,51 @@ async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: stri
 }
 
 // 检查和冻结标签页
-function checkAndFreezeTabs() {
+async function checkAndFreezeTabs() {
   const now = Date.now();
-  tabStatusList.forEach((item) => {
-    if (isTabFrozen(item.tabId)) return;
+
+  // 获取当前活动标签页信息
+  const activeTabs = await browser.tabs.query({ active: true });
+  const activeTabIds = new Set(activeTabs.map(tab => tab.id).filter(id => id !== undefined));
+
+  // 获取所有可见的标签页（通过 Page Visibility API）
+  const visibleTabIds = tabStatusList
+    .filter(tab => tab.isVisible === true && tab.visibilityState === 'visible')
+    .map(tab => tab.tabId);
+
+  for (const item of tabStatusList) {
+    if (isTabFrozen(item.tabId)) continue;
 
     const itemUrl = new URL(item.url).hostname;
-    if (whitelist.includes(itemUrl)) return;
+    if (whitelist.includes(itemUrl)) continue;
 
-    if (now - item.lastUseTime > FreezeTimeout * 60 * 1000) {
+    // 🔒 关键修复：多重保护机制防止误冻结
+    const isCurrentlyActive = activeTabIds.has(item.tabId);
+    const isCurrentlyVisible = visibleTabIds.includes(item.tabId);
+
+    // 如果标签页是活动的或可见的，不进行冻结检查
+    if (isCurrentlyActive || isCurrentlyVisible) {
+      console.log(`Skipping freeze check for active/visible tab ${item.tabId}:`, {
+        active: isCurrentlyActive,
+        visible: isCurrentlyVisible,
+        url: item.url
+      });
+      continue;
+    }
+
+    // 只有在非活动且不可见的情况下才检查超时
+    const elapsed = now - item.lastUseTime;
+    const timeout = FreezeTimeout * 60 * 1000;
+
+    if (elapsed > timeout) {
+      console.log(`Freezing inactive tab ${item.tabId}:`, {
+        elapsed: Math.round(elapsed / 1000),
+        timeout: Math.round(timeout / 1000),
+        url: item.url
+      });
       FreezeTab(item.tabId);
     }
-  });
+  }
 }
 
 // 获取当前窗口的活动标签页ID
@@ -392,7 +472,11 @@ async function saveFreeTab() {
 }
 
 // 定期检查是否需要冻结标签页
-setInterval(checkAndFreezeTabs, 60000); // 每分钟检查一次
+setInterval(() => {
+  checkAndFreezeTabs().catch(error => {
+    console.error('Error in checkAndFreezeTabs:', error);
+  });
+}, 60000); // 每分钟检查一次
 
 // 白名单管理函数
 async function getWhitelist(): Promise<string[]> {
@@ -518,21 +602,37 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
   if (request.UpdatePageInfo && sender.tab?.id) {
     const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
     if (tabStatus) {
+      const urlChanged = request.url && request.url !== tabStatus.url;
+      const titleChanged = request.title && request.title !== tabStatus.title;
+
       // 更新 URL 和标题
-      if (request.url && request.url !== tabStatus.url) {
-        tabStatus.url = request.url;
+      if (urlChanged) {
+        tabStatus.url = request.url as string;
         console.log('Updated tab URL:', { tabId: sender.tab!.id, newUrl: request.url });
       }
-      if (request.title && request.title !== tabStatus.title) {
-        tabStatus.title = request.title;
+      if (titleChanged) {
+        tabStatus.title = request.title as string;
         console.log('Updated tab title:', { tabId: sender.tab!.id, newTitle: request.title });
       }
-      sendResponse({ response: 'Page info updated' });
+
+      // 页面信息变化时重置倒计时（表示用户活跃）
+      if (urlChanged || titleChanged) {
+        const oldTime = tabStatus.lastUseTime;
+        tabStatus.lastUseTime = Date.now();
+        console.log(`Reset countdown due to page info update for tab ${sender.tab!.id}:`, {
+          urlChanged,
+          titleChanged,
+          oldTime: new Date(oldTime).toLocaleTimeString(),
+          newTime: new Date(tabStatus.lastUseTime).toLocaleTimeString()
+        });
+      }
+
+      sendResponse({ response: 'Page info updated and countdown reset' });
     } else {
       // 如果找不到记录，创建新记录
       if (sender.tab) {
         addTabToList(sender.tab);
-        sendResponse({ response: 'Tab added with page info' });
+        sendResponse({ response: 'Tab added with page info and countdown reset' });
       }
     }
   }

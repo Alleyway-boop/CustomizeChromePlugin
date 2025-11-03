@@ -99,6 +99,9 @@ window.addEventListener('focus', () => {
             notifyVisibilityChange();
         }, 100);
     }
+
+    // 页面获得焦点时重置倒计时
+    browser.runtime.sendMessage({ UpDateLastUseTime: true })
 });
 
 window.addEventListener('blur', () => {
@@ -187,6 +190,46 @@ setInterval(() => {
         }
     });
 }, 1000 * 30); // 每30s更新一次 lastUseTime
+
+// 监听用户交互活动，实时重置倒计时
+const userActivityEvents = [
+    'mousedown', 'click', 'keydown', 'scroll', 'touchstart', 'mousemove'
+];
+
+let lastActivityTime = 0;
+const ACTIVITY_THROTTLE = 5000; // 5秒内只重置一次
+
+userActivityEvents.forEach(eventType => {
+    document.addEventListener(eventType, () => {
+        const now = Date.now();
+        if (now - lastActivityTime > ACTIVITY_THROTTLE) {
+            lastActivityTime = now;
+            console.log(`User activity detected: ${eventType}`);
+
+            // 重置倒计时
+            browser.runtime.sendMessage({ UpDateLastUseTime: true }).catch(() => {
+                // 忽略错误
+            });
+        }
+    }, { passive: true });
+});
+
+// 监听页面滚动（更频繁的活动）
+let scrollThrottle = false;
+window.addEventListener('scroll', () => {
+    if (!scrollThrottle) {
+        scrollThrottle = true;
+        console.log('Scroll activity detected');
+
+        browser.runtime.sendMessage({ UpDateLastUseTime: true }).catch(() => {
+            // 忽略错误
+        });
+
+        setTimeout(() => {
+            scrollThrottle = false;
+        }, 2000); // 2秒内只响应一次滚动
+    }
+}, { passive: true });
 
 // 如果当前页面即将被关闭，通知 background script 删除当前 tab
 window.addEventListener('beforeunload', () => {
