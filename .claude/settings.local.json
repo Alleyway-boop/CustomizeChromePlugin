@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(git add:*)",
+      "mcp__shrimp-task-manager__plan_task",
+      "Bash(svgexport:*)"
+    ],
+    "deny": []
+  }
+}
