@@ -25,14 +25,14 @@
           class="border-0 bg-white/60 backdrop-blur-sm rounded-xl shadow-sm overflow-hidden">
           <div class="p-4">
             <div class="flex flex-col gap-3">
-              <div class="flex items-center justify-between p-2 bg-gray-50/50 rounded-lg">
+              <div class="flex items-center justify-between p-2 bg-gray-50/50 rounded-lg gap-10">
                 <div class="flex items-center gap-2">
                   <div class="i-carbon-time text-blue-500"></div>
-                  <span class="text-sm font-medium text-gray-700">Freeze Timer:</span>
+                  <span class="text-sm font-medium text-gray-700 text-nowrap">Freeze Timer:</span>
                 </div>
                 <div class="flex items-center gap-2">
                   <NInputNumber v-model:value="FreezeTimeout" :min="1" :max="360" size="small"
-                    @update:value="SetFreezeTimeout()" class="w-20" />
+                    @update:value="SetFreezeTimeout()" class="w-auto min-w-0" />
                   <span class="text-sm text-gray-600 font-medium">min</span>
                 </div>
               </div>
