@@ -140,22 +140,22 @@ const originalReplaceState = history.replaceState;
 const originalBack = history.back.bind(history);
 const originalForward = history.forward.bind(history);
 
-history.pushState = function(...args) {
+history.pushState = function (...args) {
     originalPushState.apply(history, args);
     setTimeout(notifyPageUpdate, 100);
 };
 
-history.replaceState = function(...args) {
+history.replaceState = function (...args) {
     originalReplaceState.apply(history, args);
     setTimeout(notifyPageUpdate, 100);
 };
 
-history.back = function(...args) {
+history.back = function (...args) {
     originalBack.apply(history, args);
     setTimeout(notifyPageUpdate, 100);
 };
 
-history.forward = function(...args) {
+history.forward = function (...args) {
     originalForward.apply(history, args);
     setTimeout(notifyPageUpdate, 100);
 };

@@ -636,6 +636,9 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
       }
     }
   }
+  if (request.getTabId) {
+    sendResponse({ response: sender.tab?.id });
+  }
   if (request.GetTabStatusList) {
     getAllTabsRemainingTime().then(result => {
       sendResponse({ response: result });
@@ -709,7 +712,7 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
   }
 
   // 处理页面可见性变化
-  if (request.SetPageVisible && sender.tab?.id) {
+  if (request.SetPageVisible) {
     const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
     if (tabStatus) {
       tabStatus.isVisible = true;
@@ -719,7 +722,7 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     }
   }
 
-  if (request.SetPageHidden && sender.tab?.id) {
+  if (request.SetPageHidden) {
     const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
     if (tabStatus) {
       tabStatus.isVisible = false;
