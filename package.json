@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && vue-tsc && node .\\script\\CallReplaceScript.cjs",
+    "build_native": "vite build && vue-tsc",
     "Debug": "vite build --debug",
     "replace": "node .\\script\\CallReplaceScript.cjs"
   },

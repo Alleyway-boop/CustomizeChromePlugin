@@ -2,10 +2,10 @@ const fs = require('fs');
 const path = require('path');
 
 const callerPath = process.cwd();
-const exePath = path.join(callerPath, "replaceParallel.exe");
+const exePath = path.join(callerPath, "replace.exe");
 fs.access(exePath, fs.constants.F_OK, (err) => {
   if (err) {
-    console.error('replaceParallel.exe 不存在');
+    console.error('replace.exe 不存在');
     return;
   }
   const childProcess = require('child_process');
