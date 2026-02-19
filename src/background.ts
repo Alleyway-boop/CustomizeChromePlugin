@@ -731,6 +731,278 @@ async function removeFromWhitelist(domain: string): Promise<{ success: boolean; 
   }
 }
 
+/**
+ * Adds multiple domains to the whitelist in a single operation
+ * Validates all domains before adding and skips duplicates
+ *
+ * @param domains - Array of domain names to add
+ * @returns Promise resolving to bulk operation result
+ *
+ * @example
+ * const result = await addMultipleToWhitelist(['example.com', 'github.com']);
+ */
+async function addMultipleToWhitelist(domains: string[]): Promise<{ success: boolean; message: string; processed: number; failed: number; errors: string[] }> {
+  const result = {
+    success: false,
+    message: '',
+    processed: 0,
+    failed: 0,
+    errors: [] as string[]
+  };
+
+  try {
+    if (!Array.isArray(domains) || domains.length === 0) {
+      return { ...result, message: 'Domains must be a non-empty array' };
+    }
+
+    const domainsToAdd: string[] = [];
+    const existingDomains = new Set(whitelist);
+
+    for (const domain of domains) {
+      if (!domain || typeof domain !== 'string') {
+        result.failed++;
+        result.errors.push(`Invalid domain: ${domain}`);
+        continue;
+      }
+
+      const normalizedDomain = normalizeDomain(domain.trim());
+      if (!normalizedDomain || !isValidDomain(normalizedDomain)) {
+        result.failed++;
+        result.errors.push(`Invalid domain format: ${domain}`);
+        continue;
+      }
+
+      if (existingDomains.has(normalizedDomain)) {
+        result.failed++;
+        result.errors.push(`Domain already in whitelist: ${normalizedDomain}`);
+        continue;
+      }
+
+      domainsToAdd.push(normalizedDomain);
+      existingDomains.add(normalizedDomain);
+      result.processed++;
+    }
+
+    if (domainsToAdd.length > 0) {
+      whitelist.push(...domainsToAdd);
+      await safeStorage.set({ whitelist });
+      console.log('Added multiple domains to whitelist:', domainsToAdd);
+    }
+
+    result.success = result.failed === 0 || result.processed > 0;
+    result.message = `Added ${result.processed} domain${result.processed !== 1 ? 's' : ''}`;
+
+  } catch (error) {
+    console.error('Error adding multiple domains:', error);
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    result.message = 'Failed to add domains';
+  }
+
+  return result;
+}
+
+/**
+ * Removes multiple domains from the whitelist in a single operation
+ *
+ * @param domains - Array of domain names to remove
+ * @returns Promise resolving to bulk operation result
+ *
+ * @example
+ * const result = await removeMultipleFromWhitelist(['example.com', 'github.com']);
+ */
+async function removeMultipleFromWhitelist(domains: string[]): Promise<{ success: boolean; message: string; processed: number; failed: number; errors: string[] }> {
+  const result = {
+    success: false,
+    message: '',
+    processed: 0,
+    failed: 0,
+    errors: [] as string[]
+  };
+
+  try {
+    if (!Array.isArray(domains) || domains.length === 0) {
+      return { ...result, message: 'Domains must be a non-empty array' };
+    }
+
+    const domainsToRemove = new Set(
+      domains
+        .filter(d => d && typeof d === 'string')
+        .map(d => normalizeDomain(d.trim()))
+        .filter(d => d)
+    );
+
+    if (domainsToRemove.size === 0) {
+      return { ...result, message: 'No valid domains to remove' };
+    }
+
+    const originalLength = whitelist.length;
+    whitelist = whitelist.filter(d => !domainsToRemove.has(d));
+    const removed = originalLength - whitelist.length;
+
+    if (removed > 0) {
+      await safeStorage.set({ whitelist });
+      console.log('Removed multiple domains from whitelist:', removed);
+    }
+
+    result.processed = removed;
+    result.failed = domainsToRemove.size - removed;
+    result.success = result.processed > 0;
+    result.message = `Removed ${result.processed} domain${result.processed !== 1 ? 's' : ''}`;
+
+  } catch (error) {
+    console.error('Error removing multiple domains:', error);
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    result.message = 'Failed to remove domains';
+  }
+
+  return result;
+}
+
+/**
+ * Clears all domains from the whitelist
+ * Destructive operation with no undo
+ *
+ * @returns Promise resolving to bulk operation result
+ *
+ * @example
+ * const result = await clearWhitelist();
+ */
+async function clearWhitelist(): Promise<{ success: boolean; message: string; processed: number; failed: number; errors: string[] }> {
+  const result = {
+    success: false,
+    message: '',
+    processed: 0,
+    failed: 0,
+    errors: [] as string[]
+  };
+
+  try {
+    const originalLength = whitelist.length;
+    whitelist = [];
+    await safeStorage.set({ whitelist });
+
+    result.processed = originalLength;
+    result.success = true;
+    result.message = `Cleared ${originalLength} domain${originalLength !== 1 ? 's' : ''} from whitelist`;
+    console.log('Cleared whitelist');
+
+  } catch (error) {
+    console.error('Error clearing whitelist:', error);
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+    result.message = 'Failed to clear whitelist';
+  }
+
+  return result;
+}
+
+/**
+ * Exports current whitelist as JSON string
+ *
+ * @returns Promise resolving to JSON export data
+ *
+ * @example
+ * const data = await exportWhitelistData();
+ */
+async function exportWhitelistData(): Promise<{ version: string; exportedAt: number; items: any[] }> {
+  const items = whitelist.map(domain => ({
+    domain,
+    addedAt: Date.now(),
+    isWildcard: domain.startsWith('*.')
+  }));
+
+  return {
+    version: '1.0.0',
+    exportedAt: Date.now(),
+    items
+  };
+}
+
+/**
+ * Imports whitelist data from JSON string
+ *
+ * @param json - JSON string containing export data
+ * @param onConflict - Strategy for handling duplicates: 'skip' | 'overwrite' | 'keep'
+ * @returns Promise resolving to import result
+ *
+ * @example
+ * const result = await importWhitelistData(jsonString, 'skip');
+ */
+async function importWhitelistData(
+  json: string,
+  onConflict: 'skip' | 'overwrite' | 'keep' = 'skip'
+): Promise<{ success: boolean; imported: number; failed: number; duplicates: number; errors: string[] }> {
+  const result = {
+    success: false,
+    imported: 0,
+    failed: 0,
+    duplicates: 0,
+    errors: [] as string[]
+  };
+
+  try {
+    let importData: any;
+    try {
+      importData = JSON.parse(json);
+    } catch (parseError) {
+      result.errors.push('Invalid JSON format');
+      return result;
+    }
+
+    if (!importData.items || !Array.isArray(importData.items)) {
+      result.errors.push('Invalid export format: missing or invalid items array');
+      return result;
+    }
+
+    const existingSet = new Set(whitelist);
+    const toAdd: string[] = [];
+
+    for (const item of importData.items) {
+      if (!item || !item.domain) {
+        result.failed++;
+        result.errors.push('Invalid item: missing domain');
+        continue;
+      }
+
+      const normalizedDomain = normalizeDomain(item.domain);
+      if (!normalizedDomain || !isValidDomain(normalizedDomain)) {
+        result.failed++;
+        result.errors.push(`Invalid domain: ${item.domain}`);
+        continue;
+      }
+
+      if (existingSet.has(normalizedDomain)) {
+        result.duplicates++;
+
+        if (onConflict === 'skip') {
+          continue;
+        } else if (onConflict === 'overwrite') {
+          // Remove existing, will add new
+          whitelist = whitelist.filter(d => d !== normalizedDomain);
+        } else if (onConflict === 'keep') {
+          continue;
+        }
+      }
+
+      toAdd.push(normalizedDomain);
+      existingSet.add(normalizedDomain);
+      result.imported++;
+    }
+
+    if (toAdd.length > 0) {
+      whitelist.push(...toAdd);
+      await safeStorage.set({ whitelist });
+    }
+
+    result.success = result.failed === 0 || result.imported > 0;
+
+  } catch (error) {
+    console.error('Error importing whitelist:', error);
+    result.errors.push(error instanceof Error ? error.message : 'Unknown error');
+  }
+
+  return result;
+}
+
 // 消息处理
 browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendResponse) => {
   const request = req as Message;
@@ -851,6 +1123,57 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     }).catch(error => {
       console.error('Error removing from whitelist:', error);
       sendResponse({ response: { success: false, message: 'Failed to remove domain from whitelist' } });
+    });
+    return true; // 异步响应
+  }
+
+  // New bulk whitelist operations
+  if (request.AddMultipleToWhitelist) {
+    addMultipleToWhitelist(request.AddMultipleToWhitelist).then(result => {
+      sendResponse({ response: result });
+    }).catch(error => {
+      console.error('Error adding multiple to whitelist:', error);
+      sendResponse({ response: { success: false, message: 'Failed to add domains to whitelist', processed: 0, failed: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] } });
+    });
+    return true; // 异步响应
+  }
+
+  if (request.RemoveMultipleFromWhitelist) {
+    removeMultipleFromWhitelist(request.RemoveMultipleFromWhitelist).then(result => {
+      sendResponse({ response: result });
+    }).catch(error => {
+      console.error('Error removing multiple from whitelist:', error);
+      sendResponse({ response: { success: false, message: 'Failed to remove domains from whitelist', processed: 0, failed: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] } });
+    });
+    return true; // 异步响应
+  }
+
+  if (request.ClearWhitelist) {
+    clearWhitelist().then(result => {
+      sendResponse({ response: result });
+    }).catch(error => {
+      console.error('Error clearing whitelist:', error);
+      sendResponse({ response: { success: false, message: 'Failed to clear whitelist', processed: 0, failed: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] } });
+    });
+    return true; // 异步响应
+  }
+
+  if (request.ExportWhitelist) {
+    exportWhitelistData().then(data => {
+      sendResponse({ response: data });
+    }).catch(error => {
+      console.error('Error exporting whitelist:', error);
+      sendResponse({ response: { success: false, message: 'Failed to export whitelist' } });
+    });
+    return true; // 异步响应
+  }
+
+  if (request.ImportWhitelist) {
+    importWhitelistData(request.ImportWhitelist.data, request.ImportWhitelist.onConflict).then(result => {
+      sendResponse({ response: result });
+    }).catch(error => {
+      console.error('Error importing whitelist:', error);
+      sendResponse({ response: { success: false, message: 'Failed to import whitelist', imported: 0, failed: 0, duplicates: 0, errors: [error instanceof Error ? error.message : 'Unknown error'] } });
     });
     return true; // 异步响应
   }

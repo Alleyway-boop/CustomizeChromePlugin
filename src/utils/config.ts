@@ -4,6 +4,21 @@
  */
 
 import { safeStorage, ExtensionError, ErrorCodes } from './error-handler';
+import {
+  type WhitelistItem,
+  type WhitelistExportData,
+  type WhitelistImportResult,
+  type BulkOperationResult,
+  WHITELIST_EXPORT_VERSION
+} from '../types/whitelist';
+import {
+  domainsToWhitelistItems,
+  whitelistItemsToDomains,
+  exportWhitelistToJson,
+  importWhitelistFromJson,
+  validateWhitelistItem,
+  normalizeWhitelistDomain,
+} from './whitelist-utils';
 
 /**
  * Application configuration interface
@@ -221,6 +236,258 @@ export class ConfigManager {
    */
   isWhitelisted(domain: string): boolean {
     return this.config.whitelist.includes(domain);
+  }
+
+  /**
+   * Adds multiple domains to the whitelist in a single operation
+   * Validates all domains before adding and skips duplicates
+   *
+   * @param domains - Array of domain names to add
+   * @throws ExtensionError if validation fails or storage operation fails
+   *
+   * @example
+   * await configManager.addMultipleToWhitelist(['example.com', 'github.com']);
+   */
+  async addMultipleToWhitelist(domains: string[]): Promise<void> {
+    try {
+      if (!Array.isArray(domains) || domains.length === 0) {
+        throw new ExtensionError(
+          'Domains must be a non-empty array',
+          ErrorCodes.VALIDATION_ERROR
+        );
+      }
+
+      const { validateWhitelistItem } = await import('./whitelist-utils');
+      const existingDomains = new Set(this.config.whitelist);
+      const domainsToAdd: string[] = [];
+
+      for (const domain of domains) {
+        if (!domain || typeof domain !== 'string') {
+          console.warn('Skipping invalid domain:', domain);
+          continue;
+        }
+
+        const validation = validateWhitelistItem(domain.trim(), true);
+        if (!validation.isValid) {
+          console.warn(`Skipping invalid domain: ${domain} - ${validation.error}`);
+          continue;
+        }
+
+        const normalized = validation.normalizedDomain!;
+        if (!existingDomains.has(normalized)) {
+          domainsToAdd.push(normalized);
+          existingDomains.add(normalized);
+        }
+      }
+
+      if (domainsToAdd.length > 0) {
+        await this.updateConfig({
+          whitelist: [...this.config.whitelist, ...domainsToAdd]
+        });
+      }
+    } catch (error) {
+      console.error('Failed to add multiple domains:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Removes multiple domains from the whitelist in a single operation
+   *
+   * @param domains - Array of domain names to remove
+   * @throws ExtensionError if storage operation fails
+   *
+   * @example
+   * await configManager.removeMultipleFromWhitelist(['example.com', 'github.com']);
+   */
+  async removeMultipleFromWhitelist(domains: string[]): Promise<void> {
+    try {
+      if (!Array.isArray(domains) || domains.length === 0) {
+        throw new ExtensionError(
+          'Domains must be a non-empty array',
+          ErrorCodes.VALIDATION_ERROR
+        );
+      }
+
+      const { normalizeWhitelistDomain } = await import('./whitelist-utils');
+      const domainsToRemove = new Set(
+        domains
+          .filter(d => d && typeof d === 'string')
+          .map(d => normalizeWhitelistDomain(d.trim()))
+          .filter(d => d)
+      );
+
+      if (domainsToRemove.size === 0) {
+        return; // Nothing to remove
+      }
+
+      await this.updateConfig({
+        whitelist: this.config.whitelist.filter(d => !domainsToRemove.has(d))
+      });
+    } catch (error) {
+      console.error('Failed to remove multiple domains:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clears all domains from the whitelist
+   * Destructive operation with no undo
+   *
+   * @throws ExtensionError if storage operation fails
+   *
+   * @example
+   * await configManager.clearWhitelist();
+   */
+  async clearWhitelist(): Promise<void> {
+    try {
+      await this.updateConfig({ whitelist: [] });
+    } catch (error) {
+      console.error('Failed to clear whitelist:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Exports the current whitelist as a structured export object
+   * Includes metadata and version information for import
+   *
+   * @returns Export data object with items and metadata
+   *
+   * @example
+   * const exportData = configManager.exportWhitelist();
+   * console.log(`Exported ${exportData.items.length} domains`);
+   */
+  exportWhitelist(): WhitelistExportData {
+    const items = domainsToWhitelistItems(this.config.whitelist);
+
+    return {
+      version: WHITELIST_EXPORT_VERSION,
+      exportedAt: Date.now(),
+      items
+    };
+  }
+
+  /**
+   * Imports whitelist data from an export object
+   * Validates and merges with existing whitelist
+   *
+   * @param data - Export data object to import
+   * @param onConflict - Strategy for handling duplicates: 'skip' | 'overwrite' | 'keep'
+   * @returns Import result with statistics
+   *
+   * @example
+   * const result = await configManager.importWhitelist(exportData, 'skip');
+   * console.log(`Imported ${result.imported} domains`);
+   */
+  async importWhitelist(
+    data: WhitelistExportData,
+    onConflict: 'skip' | 'overwrite' | 'keep' = 'skip'
+  ): Promise<WhitelistImportResult> {
+    try {
+      // Validate structure
+      if (!data || !data.items || !Array.isArray(data.items)) {
+        return {
+          success: false,
+          imported: 0,
+          failed: 0,
+          duplicates: 0,
+          errors: ['Invalid import data structure']
+        };
+      }
+
+      // Convert to JSON for importWhitelistFromJson
+      const json = JSON.stringify(data);
+
+      // Get existing domains
+      const existingDomains = this.config.whitelist;
+
+      // Import with validation
+      const importResult = importWhitelistFromJson(json, existingDomains, onConflict);
+
+      if (!importResult.success && importResult.imported === 0) {
+        return importResult;
+      }
+
+      // Add successful imports to config
+      if (importResult.imported > 0) {
+        // Parse imported items from the result
+        const importedItems: string[] = [];
+        const existingSet = new Set(existingDomains.map(d => d.toLowerCase()));
+
+        for (const item of data.items) {
+          if (!item || !item.domain) continue;
+
+          const validation = validateWhitelistItem(item.domain, true);
+
+          if (!validation.isValid) continue;
+
+          const normalized = validation.normalizedDomain!;
+
+          // Skip if already exists (and we're in skip/keep mode)
+          if (existingSet.has(normalized) && onConflict !== 'overwrite') {
+            continue;
+          }
+
+          importedItems.push(normalized);
+          existingSet.add(normalized);
+        }
+
+        if (importedItems.length > 0) {
+          // If overwriting, remove existing items first
+          if (onConflict === 'overwrite') {
+            const toRemove = importedItems.filter(d => existingDomains.includes(d));
+            if (toRemove.length > 0) {
+              await this.removeMultipleFromWhitelist(toRemove);
+            }
+          }
+
+          await this.addMultipleToWhitelist(importedItems);
+        }
+      }
+
+      return importResult;
+
+    } catch (error) {
+      console.error('Failed to import whitelist:', error);
+      return {
+        success: false,
+        imported: 0,
+        failed: 0,
+        duplicates: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown import error']
+      };
+    }
+  }
+
+  /**
+   * Gets whitelist items as structured objects with metadata
+   * Converts simple domain array to WhitelistItem objects
+   *
+   * @returns Array of WhitelistItem objects
+   *
+   * @example
+   * const items = configManager.getWhitelistItems();
+   * items.forEach(item => {
+   *   console.log(`${item.domain} added at ${new Date(item.addedAt).toISOString()}`);
+   * });
+   */
+  getWhitelistItems(): WhitelistItem[] {
+    return domainsToWhitelistItems(this.config.whitelist);
+  }
+
+  /**
+   * Gets the raw whitelist domain array
+   * Returns the simple string array format
+   *
+   * @returns Array of domain names
+   *
+   * @example
+   * const domains = configManager.getWhitelistDomains();
+   * console.log('Protected domains:', domains.join(', '));
+   */
+  getWhitelistDomains(): string[] {
+    return [...this.config.whitelist];
   }
 
   /**
