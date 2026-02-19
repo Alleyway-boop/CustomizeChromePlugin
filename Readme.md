@@ -1,5 +1,8 @@
 # CustomizeChromePlugin - Chrome标签页冻结插件
 
+[![CI Status](https://github.com/Alleyway-boop/CustomizeChromePlugin/actions/workflows/test.yml/badge.svg)](https://github.com/Alleyway-boop/CustomizeChromePlugin/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/badge/coverage-placeholder-orange)](./docs/reports/FINAL_TEST_REPORT.md)
+
 一个用于管理和冻结Chrome标签页的浏览器插件，帮助用户优化浏览体验并节省系统资源。
 
 ## 📚 文档导航

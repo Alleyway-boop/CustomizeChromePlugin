@@ -28,6 +28,12 @@ interface Message {
   SetPageVisible?: boolean;
   SetPageHidden?: boolean;
   GetVisibleTabs?: boolean;
+  // New bulk whitelist operations
+  AddMultipleToWhitelist?: string[];
+  RemoveMultipleFromWhitelist?: string[];
+  ClearWhitelist?: boolean;
+  ExportWhitelist?: boolean;
+  ImportWhitelist?: { data: string; onConflict?: 'skip' | 'overwrite' | 'keep' };
 }
 
 interface TabStatus {
@@ -48,10 +54,34 @@ interface FreezeTabStatus {
   icon: string;
   title: string;
 }
+interface BulkOperationResult {
+  success: boolean;
+  processed: number;
+  failed: number;
+  errors: string[];
+  message: string;
+}
+
+interface WhitelistExportData {
+  version: string;
+  exportedAt: number;
+  items: unknown[];
+}
+
+interface WhitelistImportResult {
+  success: boolean;
+  imported: number;
+  failed: number;
+  duplicates: number;
+  errors: string[];
+  processed?: number;
+  message?: string;
+}
+
 interface Response {
-  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | { url?: string; title?: string } | { success: boolean; message: string } | number[];
+  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | { url?: string; title?: string } | { success: boolean; message: string; restoredCount?: number } | BulkOperationResult | WhitelistExportData | WhitelistImportResult | number[];
   tabId?: number;
   error?: string;
 }
 type SendResponse = (response?: Response) => void;
-export type { Message, Response, SendResponse, TabStatus, FreezeTabStatus }
+export type { Message, Response, SendResponse, TabStatus, FreezeTabStatus, BulkOperationResult }

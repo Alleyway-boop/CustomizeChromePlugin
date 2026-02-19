@@ -8,7 +8,10 @@
     "build": "vite build && vue-tsc && node .\\script\\CallReplaceScript.cjs",
     "build_native": "vite build && vue-tsc",
     "Debug": "vite build --debug",
-    "replace": "node .\\script\\CallReplaceScript.cjs"
+    "replace": "node .\\script\\CallReplaceScript.cjs",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@iconify-json/carbon": "^1.2.11",
@@ -26,12 +29,17 @@
     "@types/webextension-polyfill": "^0.12.3",
     "@unocss/transformer-directives": "^66.3.3",
     "@vitejs/plugin-vue": "^6.0.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "4.0.18",
+    "@vue/test-utils": "^2.4.6",
     "@vueuse/core": "^13.5.0",
+    "happy-dom": "^20.6.2",
     "naive-ui": "^2.42.0",
     "typescript": "^5.8.3",
     "unocss": "^66.3.3",
     "vite": "^7.0.6",
     "vite-plugin-web-extension": "^4.4.5",
+    "vitest": "^4.0.18",
     "vue-tsc": "^3.0.4",
     "webextension-polyfill": "^0.12.0"
   },

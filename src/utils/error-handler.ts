@@ -1,7 +1,15 @@
 /**
- * 错误处理工具模块
+ * Error handling utility module
+ * Provides safe wrappers for browser APIs with error handling
  */
 
+/**
+ * Custom error class for extension-specific errors
+ * Includes error code and additional details for debugging
+ *
+ * @example
+ * throw new ExtensionError('Tab not found', ErrorCodes.TAB_ERROR, { tabId: 123 });
+ */
 export class ExtensionError extends Error {
   constructor(
     message: string,
@@ -13,6 +21,10 @@ export class ExtensionError extends Error {
   }
 }
 
+/**
+ * Enumeration of error codes used throughout the extension
+ * Provides consistent error identification and handling
+ */
 export enum ErrorCodes {
   STORAGE_ERROR = 'STORAGE_ERROR',
   TAB_ERROR = 'TAB_ERROR',
@@ -22,7 +34,21 @@ export enum ErrorCodes {
 }
 
 /**
- * 安全的错误处理包装器
+ * Safe async wrapper that catches errors and returns null on failure
+ * Prevents unhandled promise rejections in extension code
+ *
+ * @template T - The type of value the promise resolves to
+ * @param fn - Async function to execute
+ * @param errorHandler - Optional callback for error handling
+ * @returns Promise resolving to the function result or null on error
+ *
+ * @example
+ * const tab = await safeAsync(() => browser.tabs.get(123));
+ * if (tab) {
+ *   console.log(tab.url);
+ * } else {
+ *   console.log('Tab not found or error occurred');
+ * }
  */
 export async function safeAsync<T>(
   fn: () => Promise<T>,
@@ -38,7 +64,22 @@ export async function safeAsync<T>(
 }
 
 /**
- * 带重试的异步操作
+ * Async function wrapper with retry logic and exponential backoff
+ * Useful for operations that may fail transiently
+ *
+ * @template T - The type of value the promise resolves to
+ * @param fn - Async function to execute
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
+ * @param delay - Delay between retries in milliseconds (default: 1000)
+ * @returns Promise resolving to the function result
+ * @throws ExtensionError if all retries fail
+ *
+ * @example
+ * const data = await withRetry(
+ *   () => fetchFromAPI(url),
+ *   5,    // max 5 retries
+ *   2000  // 2 second delay
+ * );
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -68,7 +109,15 @@ export async function withRetry<T>(
 }
 
 /**
- * 验证URL格式
+ * Validates if a string is a valid HTTP or HTTPS URL
+ *
+ * @param url - The URL string to validate
+ * @returns true if the URL is valid HTTP(S), false otherwise
+ *
+ * @example
+ * isValidUrl('https://example.com');  // true
+ * isValidUrl('ftp://example.com');    // false
+ * isValidUrl('not-a-url');            // false
  */
 export function isValidUrl(url: string): boolean {
   try {
@@ -80,14 +129,33 @@ export function isValidUrl(url: string): boolean {
 }
 
 /**
- * 验证标签页ID
+ * Validates if a number is a valid tab ID (positive integer)
+ *
+ * @param tabId - The tab ID to validate
+ * @returns true if the tab ID is valid, false otherwise
+ *
+ * @example
+ * isValidTabId(123);    // true
+ * isValidTabId(-1);     // false
+ * isValidTabId(0);      // false
+ * isValidTabId(1.5);    // false
  */
 export function isValidTabId(tabId: number): boolean {
   return Number.isInteger(tabId) && tabId > 0;
 }
 
 /**
- * 验证域名格式
+ * Validates if a string is a valid domain name
+ * Checks format, length, and label constraints
+ *
+ * @param domain - The domain string to validate
+ * @returns true if the domain is valid, false otherwise
+ *
+ * @example
+ * isValidDomain('example.com');           // true
+ * isValidDomain('sub.example.com');       // true
+ * isValidDomain('invalid..domain');       // false
+ * isValidDomain('a'.repeat(254));         // false (too long)
  */
 export function isValidDomain(domain: string): boolean {
   if (!domain || typeof domain !== 'string') {
@@ -115,7 +183,18 @@ export function isValidDomain(domain: string): boolean {
 }
 
 /**
- * 标准化域名格式
+ * Normalizes a domain string by removing protocol, port, and path
+ * Converts to lowercase and trims whitespace
+ *
+ * @param domain - The domain string to normalize (can be full URL)
+ * @returns Normalized domain name or empty string if input is invalid
+ *
+ * @example
+ * normalizeDomain('https://sub.example.com:8080/path');
+ * // Returns: 'sub.example.com'
+ *
+ * normalizeDomain('Example.Com');
+ * // Returns: 'example.com'
  */
 export function normalizeDomain(domain: string): string {
   if (!domain) return '';
@@ -129,7 +208,8 @@ export function normalizeDomain(domain: string): string {
 }
 
 /**
- * 安全的存储操作
+ * Safe storage operations wrapper with error handling
+ * Provides type-safe get/set/remove operations for browser.storage.sync
  */
 export const safeStorage = {
   async get<T>(keys: string[]): Promise<Record<string, T>> {
@@ -170,7 +250,8 @@ export const safeStorage = {
 };
 
 /**
- * 安全的标签页操作
+ * Safe tab operations wrapper with validation and error handling
+ * Provides type-safe get/query/update operations for browser.tabs API
  */
 export const safeTabs = {
   async get(tabId: number): Promise<browser.tabs.Tab> {

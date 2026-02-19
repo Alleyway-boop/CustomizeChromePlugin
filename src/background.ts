@@ -32,7 +32,17 @@ interface FreezeTabStatus {
 let tabStatusList: TabStatus[] = [];
 let freezeTabStatusList: FreezeTabStatus[] = [];
 
-// 白名单数据验证和清理
+/**
+ * Validates and cleans whitelist data from storage
+ * Removes invalid entries, normalizes domain names, and eliminates duplicates
+ *
+ * @param inputWhitelist - Raw whitelist data from storage (unknown type)
+ * @returns Promise resolving to cleaned array of valid domain names
+ *
+ * @example
+ * const cleaned = await validateAndCleanWhitelist(['example.com', 'invalid..domain', 'Example.Com']);
+ * // Returns: ['example.com']
+ */
 async function validateAndCleanWhitelist(inputWhitelist: unknown): Promise<string[]> {
   if (!Array.isArray(inputWhitelist)) {
     console.warn('Invalid whitelist data from storage, expected array, got:', typeof inputWhitelist);
@@ -137,7 +147,16 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// 标签页管理函数
+/**
+ * Adds a new tab to the tracking list
+ * Skips pinned tabs (if FreezePinned is disabled) and non-HTTP(S) URLs
+ *
+ * @param tab - The tab object to add
+ *
+ * @example
+ * const tab = await browser.tabs.get(123);
+ * addTabToList(tab);
+ */
 function addTabToList(tab: browser.Tabs.Tab) {
   if (tab.id === undefined) return;
   if (tab.pinned && !FreezePinned.value) return;
@@ -161,6 +180,15 @@ function addTabToList(tab: browser.Tabs.Tab) {
   console.log('New tab added:', newTab);
 }
 
+/**
+ * Updates an existing tab's information in the tracking list
+ * If the tab doesn't exist, adds it as a new entry
+ *
+ * @param tab - The tab object with updated information
+ *
+ * @example
+ * updateTabInList({ id: 123, url: 'https://newurl.com', ... });
+ */
 function updateTabInList(tab: browser.Tabs.Tab) {
   if (tab.id === undefined) return;
 
@@ -178,6 +206,14 @@ function updateTabInList(tab: browser.Tabs.Tab) {
   }
 }
 
+/**
+ * Removes a tab from both active and frozen tracking lists
+ *
+ * @param tabId - The ID of the tab to remove
+ *
+ * @example
+ * removeTabFromList(123);
+ */
 function removeTabFromList(tabId: number) {
   const index = tabStatusList.findIndex(tab => tab.tabId === tabId);
   const freezeIndex = freezeTabStatusList.findIndex(tab => tab.tabId === tabId);
@@ -254,7 +290,16 @@ browser.tabs.query({}).then(tabs => {
   });
 });
 
-// 冻结标签页函数
+/**
+ * Freezes a tab by capturing its visible state and replacing it with a freeze page
+ * The original URL and snapshot are stored for later restoration
+ *
+ * @param tabId - The ID of the tab to freeze
+ * @returns Promise that resolves when the tab is frozen
+ *
+ * @example
+ * await FreezeTab(123);
+ */
 async function FreezeTab(tabId: number) {
   try {
     const tab = await browser.tabs.get(tabId);
@@ -304,7 +349,16 @@ async function FreezeTab(tabId: number) {
   }
 }
 
-// 恢复所有冻结的标签页
+/**
+ * Restores all frozen tabs to their original URLs
+ * Removes invalid entries from the freeze list
+ *
+ * @returns Promise resolving to operation result with success status, message, and count
+ *
+ * @example
+ * const result = await restoreAllFrozenTabs();
+ * console.log(`Restored ${result.restoredCount} tabs`);
+ */
 async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: string; restoredCount: number }> {
   try {
     if (freezeTabStatusList.length === 0) {
@@ -362,7 +416,16 @@ async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: stri
   }
 }
 
-// 检查和冻结标签页
+/**
+ * Checks all tracked tabs and freezes those that have exceeded the timeout
+ * Skips active, visible, and whitelisted tabs
+ * Uses Page Visibility API state to determine actual visibility
+ *
+ * @returns Promise that resolves when check is complete
+ *
+ * @example
+ * await checkAndFreezeTabs();
+ */
 async function checkAndFreezeTabs() {
   const now = Date.now();
 
@@ -410,7 +473,14 @@ async function checkAndFreezeTabs() {
   }
 }
 
-// 获取当前窗口的活动标签页ID
+/**
+ * Gets the ID of the currently active tab in the current window
+ *
+ * @returns Promise resolving to tab ID or null if no active tab
+ *
+ * @example
+ * const tabId = await getCurrentActiveTabId();
+ */
 async function getCurrentActiveTabId(): Promise<number | null> {
   try {
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
@@ -421,7 +491,23 @@ async function getCurrentActiveTabId(): Promise<number | null> {
   }
 }
 
-// 计算标签页剩余冻结时间（分钟）
+/**
+ * Calculates the remaining time (in minutes) before a tab will be frozen
+ * Returns -1 for active/visible tabs (never freeze)
+ *
+ * @param tabId - The ID of the tab to check
+ * @returns Promise resolving to minutes remaining, or -1 if tab is active
+ *
+ * @example
+ * const minutes = await calculateRemainingTime(123);
+ * if (minutes === -1) {
+ *   console.log('Tab is active');
+ * } else if (minutes === 0) {
+ *   console.log('Tab will freeze soon');
+ * } else {
+ *   console.log(`${minutes} minutes until freeze`);
+ * }
+ */
 async function calculateRemainingTime(tabId: number): Promise<number> {
   const tab = tabStatusList.find(item => item.tabId === tabId);
   if (!tab) return 0;
@@ -446,7 +532,17 @@ async function calculateRemainingTime(tabId: number): Promise<number> {
   return Math.max(0, Math.ceil(remaining / (60 * 1000))); // 返回分钟数
 }
 
-// 获取所有标签页的剩余时间信息
+/**
+ * Gets remaining time information for all tracked tabs
+ *
+ * @returns Promise resolving to array of tab info with remaining minutes
+ *
+ * @example
+ * const tabs = await getAllTabsRemainingTime();
+ * tabs.forEach(tab => {
+ *   console.log(`${tab.title}: ${tab.remainingMinutes} min remaining`);
+ * });
+ */
 async function getAllTabsRemainingTime() {
   const tabPromises = tabStatusList.map(async tab => ({
     tabId: tab.tabId,
@@ -462,11 +558,29 @@ async function getAllTabsRemainingTime() {
   return await Promise.all(tabPromises);
 }
 
-// 辅助函数
+/**
+ * Checks if a tab is currently frozen
+ *
+ * @param tabId - The ID of the tab to check
+ * @returns true if the tab is in the frozen list, false otherwise
+ *
+ * @example
+ * if (isTabFrozen(123)) {
+ *   console.log('Tab is frozen');
+ * }
+ */
 function isTabFrozen(tabId: number): boolean {
   return freezeTabStatusList.some(tab => tab.tabId === tabId);
 }
 
+/**
+ * Saves the current freeze tab status list to storage
+ *
+ * @returns Promise that resolves when data is saved
+ *
+ * @example
+ * await saveFreeTab();
+ */
 async function saveFreeTab() {
   await browser.storage.sync.set({ 'freezeTabStatusList': freezeTabStatusList });
 }
@@ -478,7 +592,16 @@ setInterval(() => {
   });
 }, 60000); // 每分钟检查一次
 
-// 白名单管理函数
+/**
+ * Retrieves the current whitelist with validation
+ * Filters out invalid domain entries
+ *
+ * @returns Promise resolving to array of whitelisted domain names
+ *
+ * @example
+ * const whitelist = await getWhitelist();
+ * console.log('Protected domains:', whitelist);
+ */
 async function getWhitelist(): Promise<string[]> {
   try {
     // 验证白名单数据完整性
@@ -513,6 +636,19 @@ async function getWhitelist(): Promise<string[]> {
   }
 }
 
+/**
+ * Adds a domain to the whitelist
+ * Normalizes the domain and validates before adding
+ *
+ * @param domain - The domain name to add (can be full URL or just domain)
+ * @returns Promise resolving to success status and message
+ *
+ * @example
+ * const result = await addToWhitelist('example.com');
+ * if (result.success) {
+ *   console.log(result.message);
+ * }
+ */
 async function addToWhitelist(domain: string): Promise<{ success: boolean; message: string }> {
   try {
     if (!domain || typeof domain !== 'string') {
@@ -550,6 +686,18 @@ async function addToWhitelist(domain: string): Promise<{ success: boolean; messa
   }
 }
 
+/**
+ * Removes a domain from the whitelist
+ *
+ * @param domain - The domain name to remove
+ * @returns Promise resolving to success status and message
+ *
+ * @example
+ * const result = await removeFromWhitelist('example.com');
+ * if (result.success) {
+ *   console.log(result.message);
+ * }
+ */
 async function removeFromWhitelist(domain: string): Promise<{ success: boolean; message: string }> {
   try {
     if (!domain || typeof domain !== 'string') {
@@ -740,7 +888,15 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
   return true;
 });
 
-// 上下文菜单
+/**
+ * Creates the extension's context menu items
+ * Removes existing menus before creating new ones
+ *
+ * @returns Promise that resolves when menus are created
+ *
+ * @example
+ * await createContextMenus();
+ */
 function createContextMenus() {
   browser.contextMenus.removeAll().then(() => {
     browser.contextMenus.create({
@@ -784,7 +940,15 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// 清理功能
+/**
+ * Removes closed tabs from the freeze list
+ * Compares against currently open tabs and removes stale entries
+ *
+ * @returns Promise that resolves when cleanup is complete
+ *
+ * @example
+ * await cleanupFrozenTabs();
+ */
 function cleanupFrozenTabs() {
   browser.tabs.query({}).then(tabs => {
     const currentTabIds = tabs.map(tab => tab.id);

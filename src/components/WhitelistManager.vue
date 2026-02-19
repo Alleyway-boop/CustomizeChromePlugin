@@ -12,7 +12,6 @@ import {
   NThing,
   NAvatar
 } from 'naive-ui'
-import { useElementHover } from '@vueuse/core'
 import { configManager } from '../utils/config'
 
 // 简单的防抖函数实现

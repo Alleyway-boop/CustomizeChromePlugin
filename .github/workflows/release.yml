@@ -1,0 +1,114 @@
+name: Release
+
+# 触发条件: 创建以 v 开头的标签 (如 v1.0.0)
+on:
+  push:
+    tags:
+      - 'v*'
+
+# 环境变量
+env:
+  NODE_VERSION: '20.x'
+  PNPM_VERSION: '8.14.1'
+
+jobs:
+  # 构建和发布作业
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2. 设置 Node.js
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # 3. 设置 pnpm
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      # 4. 缓存依赖
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      # 5. 安装依赖
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # 6. 构建生产版本
+      - name: Build production
+        run: pnpm run build
+
+      # 7. 生成版本信息文件
+      - name: Generate version info
+        run: |
+          echo "Version: ${{ github.ref_name }}" > dist/VERSION.txt
+          echo "Commit: ${{ github.sha }}" >> dist/VERSION.txt
+          echo "Build Date: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> dist/VERSION.txt
+          git log --format="%H %s" -n 10 >> dist/VERSION.txt
+
+      # 8. 打包构建产物为 ZIP
+      - name: Create release archive
+        run: |
+          cd dist
+          zip -r ../customize-chrome-plugin-${{ github.ref_name }}.zip .
+          cd ..
+
+      # 9. 提取发布说明
+      - name: Extract release notes
+        id: release_notes
+        run: |
+          # 从标签信息中提取发布说明
+          NOTES=$(git tag -l ${{ github.ref_name }} --format='%(contents)')
+          # 如果没有标签说明，使用默认说明
+          if [ -z "$NOTES" ]; then
+            NOTES="Release ${{ github.ref_name }}"
+          fi
+          # 保存到文件供后续步骤使用
+          echo "$NOTES" > release_notes.txt
+
+      # 10. 创建 GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CustomizeChromePlugin ${{ github.ref_name }}
+          body_path: release_notes.txt
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+          files: |
+            customize-chrome-plugin-${{ github.ref_name }}.zip
+            dist/VERSION.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 11. 上传构建产物
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.ref_name }}
+          path: |
+            customize-chrome-plugin-${{ github.ref_name }}.zip
+            dist/
+          retention-days: 90

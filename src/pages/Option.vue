@@ -10,7 +10,6 @@ import {
     UploadSettledFileInfo,
 } from "naive-ui";
 import browser from "webextension-polyfill";
-import { useElementHover } from "@vueuse/core";
 
 // 安全的 URL 解码函数
 function decodeURIComponentSafe(encoded: string): string {

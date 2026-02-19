@@ -1,11 +1,25 @@
 /**
- * 性能优化工具模块
+ * Performance optimization utility module
+ * Provides debounce, throttle, caching, and scheduling utilities
  */
 
 import { safeAsync } from './error-handler';
 
 /**
- * 防抖函数
+ * Creates a debounced function that delays invoking func until after wait milliseconds
+ * have elapsed since the last time the debounced function was invoked
+ *
+ * @template T - Function type to debounce
+ * @param func - The function to debounce
+ * @param wait - The number of milliseconds to delay
+ * @returns A new debounced function
+ *
+ * @example
+ * const debouncedSearch = debounce((query: string) => {
+ *   performSearch(query);
+ * }, 300);
+ *
+ * debouncedSearch('test'); // Only executes after 300ms of no calls
  */
 export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
@@ -25,7 +39,19 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 }
 
 /**
- * 节流函数
+ * Creates a throttled function that only invokes func at most once per every wait milliseconds
+ *
+ * @template T - Function type to throttle
+ * @param func - The function to throttle
+ * @param limit - The number of milliseconds to throttle invocations to
+ * @returns A new throttled function
+ *
+ * @example
+ * const throttledScroll = throttle(() => {
+ *   updateScrollPosition();
+ * }, 100);
+ *
+ * window.addEventListener('scroll', throttledScroll);
  */
 export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
@@ -43,21 +69,40 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 }
 
 /**
- * 内存使用监控
+ * Monitors browser memory usage and notifies subscribers of changes
+ * Only works in browsers that support the system.memory API
+ *
+ * @example
+ * const monitor = MemoryMonitor.getInstance();
+ * monitor.onMemoryUpdate((usage) => {
+ *   console.log('Memory usage:', usage);
+ * });
+ * monitor.startMonitoring(30000); // Check every 30 seconds
  */
 export class MemoryMonitor {
   private static instance: MemoryMonitor;
   private callbacks: ((usage: any) => void)[] = [];
   private intervalId?: number;
 
-  static getInstance(): MemoryMonitor {
+    /**
+     * Gets the singleton MemoryMonitor instance
+     * Creates a new instance if one doesn't exist
+     *
+     * @returns The MemoryMonitor singleton instance
+     */
+    static getInstance(): MemoryMonitor {
     if (!MemoryMonitor.instance) {
       MemoryMonitor.instance = new MemoryMonitor();
     }
     return MemoryMonitor.instance;
   }
 
-  startMonitoring(interval: number = 30000): void {
+    /**
+     * Starts monitoring memory usage at the specified interval
+     *
+     * @param interval - Monitoring interval in milliseconds (default: 30000)
+     */
+    startMonitoring(interval: number = 30000): void {
     if (this.intervalId) {
       this.stopMonitoring();
     }
@@ -73,18 +118,29 @@ export class MemoryMonitor {
     }, interval);
   }
 
-  stopMonitoring(): void {
+    /** Stops monitoring memory usage */
+    stopMonitoring(): void {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
     }
   }
 
-  onMemoryUpdate(callback: (usage: any) => void): void {
+    /**
+     * Adds a callback to be invoked when memory usage is updated
+     *
+     * @param callback - Function to call with memory usage data
+     */
+    onMemoryUpdate(callback: (usage: any) => void): void {
     this.callbacks.push(callback);
   }
 
-  removeCallback(callback: (usage: any) => void): void {
+    /**
+     * Removes a previously added callback
+     *
+     * @param callback - The callback function to remove
+     */
+    removeCallback(callback: (usage: any) => void): void {
     const index = this.callbacks.indexOf(callback);
     if (index > -1) {
       this.callbacks.splice(index, 1);
@@ -93,16 +149,38 @@ export class MemoryMonitor {
 }
 
 /**
- * 性能指标收集器
+ * Collects and analyzes performance metrics for operations
+ * Tracks timing data and provides statistics (average, min, max)
+ *
+ * @example
+ * const collector = new PerformanceCollector();
+ *
+ * collector.startTimer('operation');
+ * // ... do work ...
+ * const duration = collector.endTimer('operation');
+ *
+ * console.log('Average:', collector.getAverage('operation'));
+ * console.log('Max:', collector.getMax('operation'));
  */
 export class PerformanceCollector {
   private metrics: Map<string, number[]> = new Map();
   private timestamps: Map<string, number> = new Map();
 
+  /**
+   * Starts timing an operation with the given key
+   *
+   * @param key - Unique identifier for the timed operation
+   */
   startTimer(key: string): void {
     this.timestamps.set(key, Date.now());
   }
 
+  /**
+   * Ends timing an operation and records the duration
+   *
+   * @param key - The identifier used when starting the timer
+   * @returns The duration in milliseconds, or null if timer wasn't started
+   */
   endTimer(key: string): number | null {
     const startTime = this.timestamps.get(key);
     if (!startTime) return null;
@@ -117,6 +195,12 @@ export class PerformanceCollector {
     return duration;
   }
 
+  /**
+   * Calculates the average duration for an operation
+   *
+   * @param key - The operation identifier
+   * @returns Average duration in milliseconds, or null if no data
+   */
   getAverage(key: string): number | null {
     const metrics = this.metrics.get(key);
     if (!metrics || metrics.length === 0) return null;
@@ -125,6 +209,12 @@ export class PerformanceCollector {
     return sum / metrics.length;
   }
 
+  /**
+   * Gets the maximum duration recorded for an operation
+   *
+   * @param key - The operation identifier
+   * @returns Maximum duration in milliseconds, or null if no data
+   */
   getMax(key: string): number | null {
     const metrics = this.metrics.get(key);
     if (!metrics || metrics.length === 0) return null;
@@ -132,6 +222,12 @@ export class PerformanceCollector {
     return Math.max(...metrics);
   }
 
+  /**
+   * Gets the minimum duration recorded for an operation
+   *
+   * @param key - The operation identifier
+   * @returns Minimum duration in milliseconds, or null if no data
+   */
   getMin(key: string): number | null {
     const metrics = this.metrics.get(key);
     if (!metrics || metrics.length === 0) return null;
@@ -139,10 +235,21 @@ export class PerformanceCollector {
     return Math.min(...metrics);
   }
 
+  /**
+   * Gets all recorded durations for an operation
+   *
+   * @param key - The operation identifier
+   * @returns Array of durations in milliseconds
+   */
   getMetrics(key: string): number[] {
     return this.metrics.get(key) || [];
   }
 
+  /**
+   * Clears recorded metrics for a specific operation or all operations
+   *
+   * @param key - Optional operation identifier to clear, clears all if omitted
+   */
   clearMetrics(key?: string): void {
     if (key) {
       this.metrics.delete(key);
@@ -153,7 +260,17 @@ export class PerformanceCollector {
 }
 
 /**
- * 智能调度器
+ * Intelligent task scheduler for managing periodic operations
+ * Optimizes by checking multiple tasks on a single interval
+ *
+ * @example
+ * const scheduler = new SmartScheduler();
+ *
+ * scheduler.addTask('checkTabs', async () => {
+ *   await checkAndFreezeTabs();
+ * }, 60000); // Run every 60 seconds
+ *
+ * scheduler.start(1000); // Check every second if tasks need to run
  */
 export class SmartScheduler {
   private tasks: Map<string, { 
@@ -164,9 +281,17 @@ export class SmartScheduler {
   }> = new Map();
   private intervalId?: number;
 
+  /**
+   * Adds a task to the scheduler
+   *
+   * @param id - Unique identifier for the task
+   * @param fn - Async function to execute
+   * @param interval - Minimum time between executions in milliseconds
+   * @param enabled - Whether the task is initially enabled (default: true)
+   */
   addTask(
-    id: string, 
-    fn: () => Promise<void>, 
+    id: string,
+    fn: () => Promise<void>,
     interval: number,
     enabled: boolean = true
   ): void {
@@ -178,10 +303,20 @@ export class SmartScheduler {
     });
   }
 
+  /**
+   * Removes a task from the scheduler
+   *
+   * @param id - The task identifier to remove
+   */
   removeTask(id: string): void {
     this.tasks.delete(id);
   }
 
+  /**
+   * Enables a previously disabled task
+   *
+   * @param id - The task identifier to enable
+   */
   enableTask(id: string): void {
     const task = this.tasks.get(id);
     if (task) {
@@ -189,6 +324,11 @@ export class SmartScheduler {
     }
   }
 
+  /**
+   * Disables a task without removing it
+   *
+   * @param id - The task identifier to disable
+   */
   disableTask(id: string): void {
     const task = this.tasks.get(id);
     if (task) {
@@ -196,6 +336,11 @@ export class SmartScheduler {
     }
   }
 
+  /**
+   * Starts the scheduler
+   *
+   * @param checkInterval - How often to check for tasks to run (default: 1000ms)
+   */
   start(checkInterval: number = 1000): void {
     if (this.intervalId) {
       this.stop();
@@ -213,6 +358,7 @@ export class SmartScheduler {
     }, checkInterval);
   }
 
+  /** Stops the scheduler */
   stop(): void {
     if (this.intervalId) {
       clearInterval(this.intervalId);
@@ -222,16 +368,40 @@ export class SmartScheduler {
 }
 
 /**
- * 缓存管理器
+ * Generic cache manager with TTL (Time To Live) support
+ * Automatically expires entries after their TTL expires
+ *
+ * @template T - The type of data to cache
+ *
+ * @example
+ * const cache = new CacheManager<UserData>(300000); // 5 minute TTL
+ *
+ * cache.set('user123', userData);
+ * const cached = cache.get('user123');
+ * if (cached) {
+ *   console.log('Hit!', cached);
+ * } else {
+ *   console.log('Miss or expired');
+ * }
  */
 export class CacheManager<T> {
   private cache: Map<string, { data: T; timestamp: number; ttl: number }> = new Map();
   private cleanupInterval?: number;
 
-  constructor(private defaultTTL: number = 300000) { // 5分钟默认TTL
+  /**
+   * Creates a new cache manager
+   *
+   * @param defaultTTL - Default time-to-live for cached items (default: 300000ms = 5 minutes)
+   */
+  constructor(private defaultTTL: number = 300000) { }
 
-  }
-
+  /**
+   * Stores data in the cache with a TTL
+   *
+   * @param key - Unique identifier for the cached data
+   * @param data - The data to cache
+   * @param ttl - Time-to-live in milliseconds (uses default if not specified)
+   */
   set(key: string, data: T, ttl: number = this.defaultTTL): void {
     this.cache.set(key, {
       data,
@@ -240,6 +410,13 @@ export class CacheManager<T> {
     });
   }
 
+  /**
+   * Retrieves data from the cache
+   * Returns null if the key doesn't exist or the entry has expired
+   *
+   * @param key - The cache key to retrieve
+   * @returns The cached data, or null if not found or expired
+   */
   get(key: string): T | null {
     const item = this.cache.get(key);
     if (!item) return null;
@@ -252,18 +429,35 @@ export class CacheManager<T> {
     return item.data;
   }
 
+  /**
+   * Checks if a key exists in the cache and hasn't expired
+   *
+   * @param key - The cache key to check
+   * @returns true if the key exists and is valid
+   */
   has(key: string): boolean {
     return this.get(key) !== null;
   }
 
+  /**
+   * Removes a specific entry from the cache
+   *
+   * @param key - The cache key to delete
+   */
   delete(key: string): void {
     this.cache.delete(key);
   }
 
+  /** Clears all entries from the cache */
   clear(): void {
     this.cache.clear();
   }
 
+  /**
+   * Starts automatic cleanup of expired entries
+   *
+   * @param interval - Cleanup interval in milliseconds (default: 60000)
+   */
   startCleanup(interval: number = 60000): void {
     if (this.cleanupInterval) {
       this.stopCleanup();
@@ -279,6 +473,7 @@ export class CacheManager<T> {
     }, interval);
   }
 
+  /** Stops automatic cleanup */
   stopCleanup(): void {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);

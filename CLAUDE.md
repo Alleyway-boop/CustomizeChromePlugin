@@ -59,19 +59,139 @@ A Chrome/Firefox extension for intelligent tab management and system resource op
 - **Singleton pattern** for configuration management (`ConfigManager`)
 
 ### Message Passing Architecture
+
+The extension uses Chrome's message passing API for communication between background scripts, content scripts, and popup UI. All message types are defined in `src/utils/index.ts`.
+
+#### Message Types
+
 ```typescript
-// Message types defined in utils/index.ts
 interface Message {
+  // Tab identification
+  getTabId?: boolean;
+
+  // Tab status updates
+  UpDateLastUseTime?: boolean;
   UpdatePageInfo?: boolean;
   UpdateTabStatus?: boolean;
   url?: string;
   title?: string;
+
+  // Tab queries
+  type?: string;
+  getTabActive?: boolean;
+  GetTabStatusList?: boolean;
+  GetRemainingTime?: boolean;
+  GetVisibleTabs?: boolean;
   tabId?: number;
-  // ... other message types
+
+  // Tab lifecycle
+  DeleteTab?: boolean;
+
+  // Freeze management
+  GetFreezeTabList?: boolean;
+  RecoverFreezeTab?: boolean;
+  RecoverTab?: boolean;
+  RemoveFreezeTab?: number;
+  RestoreAllFrozenTabs?: boolean;
+
+  // Whitelist management
+  GetWhitelist?: boolean;
+  AddToWhitelist?: string;
+  RemoveFromWhitelist?: string;
+
+  // Page visibility
+  SetPageVisible?: boolean;
+  SetPageHidden?: boolean;
+
+  // Navigation
+  GotoTaskPage?: boolean;
+  data?: unknown;
+}
+```
+
+#### Response Format
+
+```typescript
+interface Response {
+  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean |
+             number | { url?: string; title?: string } |
+             { success: boolean; message: string; restoredCount?: number } |
+             number[] | undefined;
+  tabId?: number;
+  error?: string;
 }
 
-// Background script ↔ Content script ↔ Popup UI communication
+type SendResponse = (response?: Response) => void;
 ```
+
+#### API Usage Examples
+
+**Sending messages from Content Script:**
+```typescript
+import browser from 'webextension-polyfill';
+
+// Simple message (fire and forget)
+browser.runtime.sendMessage({ UpDateLastUseTime: true });
+
+// Message with response
+const response = await browser.runtime.sendMessage({ getTabId: true });
+console.log('Tab ID:', response.response);
+
+// Update page info
+browser.runtime.sendMessage({
+  UpdatePageInfo: true,
+  url: window.location.href,
+  title: document.title
+});
+```
+
+**Sending messages from Popup UI:**
+```typescript
+// Get tab status list
+const response = await browser.runtime.sendMessage({
+  GetTabStatusList: true
+});
+const tabs = response.response as TabStatus[];
+
+// Restore all frozen tabs
+const result = await browser.runtime.sendMessage({
+  RestoreAllFrozenTabs: true
+});
+console.log(result.response.message);
+
+// Whitelist operations
+await browser.runtime.sendMessage({ AddToWhitelist: 'example.com' });
+await browser.runtime.sendMessage({ RemoveFromWhitelist: 'example.com' });
+```
+
+**Sending messages from Background Script:**
+```typescript
+// Send to specific tab
+const tabId = 123;
+browser.tabs.sendMessage(tabId, { type: 'getPageInfo' })
+  .then((response) => {
+    console.log('Page info:', response.response);
+  });
+```
+
+#### Message Handlers Reference
+
+| Message | Direction | Response Type | Description |
+|---------|-----------|---------------|-------------|
+| `getTabId` | Content → Background | `number` | Get current tab ID |
+| `UpDateLastUseTime` | Content → Background | `string` | Reset activity timer |
+| `UpdatePageInfo` | Content → Background | `string` | Update URL/title |
+| `GetTabStatusList` | Popup → Background | `TabStatus[]` | Get all tabs with time remaining |
+| `GetRemainingTime` | Popup → Background | `number` | Get minutes until freeze (-1 = active) |
+| `GetFreezeTabList` | Popup → Background | `FreezeTabStatus[]` | Get frozen tabs |
+| `RestoreAllFrozenTabs` | Popup → Background | `{success, message, restoredCount}` | Restore all frozen tabs |
+| `RemoveFreezeTab` | Popup → Background | `string` | Remove from freeze list |
+| `GetWhitelist` | Popup → Background | `string[]` | Get whitelist |
+| `AddToWhitelist` | Popup → Background | `{success, message}` | Add domain to whitelist |
+| `RemoveFromWhitelist` | Popup → Background | `{success, message}` | Remove from whitelist |
+| `SetPageVisible` | Content → Background | - | Report page visible |
+| `SetPageHidden` | Content → Background | - | Report page hidden |
+| `GetVisibleTabs` | Any → Background | `number[]` | Get visible tab IDs |
 
 ## Development Workflow
 

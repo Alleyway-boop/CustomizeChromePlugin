@@ -1,15 +1,30 @@
+/**
+ * Content Script - Page Visibility and Activity Monitoring
+ *
+ * This script is injected into every web page to:
+ * - Track page visibility state using Page Visibility API
+ * - Monitor user activity to prevent unwanted tab freezing
+ * - Report page navigation changes (including SPA routes)
+ * - Communicate with background script for tab status updates
+ */
+
 import browser from 'webextension-polyfill';
 import { SendResponse, Response, Message } from './utils/index';
 
-// 获取当前 tab 信息并监听变化
+/** Current tab ID assigned by background script */
 let currentTabId: number | null = null;
+/** Last tracked URL for change detection */
 let lastUrl: string = window.location.href;
 
-// 页面可见性状态管理
+/** Current page visibility state from Page Visibility API */
 let currentVisibilityState: string = document.visibilityState;
+/** Last reported visibility state to prevent duplicate reports */
 let lastVisibilityReport: string = currentVisibilityState;
 
-// 通知 background script 页面信息更新
+/**
+ * Notifies background script of page URL or title changes
+ * Only sends update if changes are detected to reduce message traffic
+ */
 function notifyPageUpdate() {
     if (!currentTabId) return;
 
@@ -32,7 +47,10 @@ function notifyPageUpdate() {
     }
 }
 
-// 通知 background script 页面可见性变化
+/**
+ * Notifies background script of page visibility state changes
+ * Throttles duplicate reports of the same state
+ */
 function notifyVisibilityChange() {
     if (!currentTabId) return;
 
@@ -69,7 +87,12 @@ function notifyVisibilityChange() {
     });
 }
 
-// init content script
+/**
+ * Initializes the content script by:
+ * 1. Getting the tab ID from background script
+ * 2. Reporting initial page information
+ * 3. Reporting initial visibility state
+ */
 browser.runtime.sendMessage({ getTabId: true }).then((tabId) => {
     currentTabId = tabId as number;
 
@@ -112,7 +135,10 @@ window.addEventListener('blur', () => {
     }, 100);
 });
 
-// 监听来自 background script 的消息
+/**
+ * Listens for messages from background script
+ * Handles getPageInfo requests by returning current URL and title
+ */
 browser.runtime.onMessage.addListener((request, sender, sendResponse: SendResponse) => {
     console.warn('Received message from background script:', request);
 
@@ -133,8 +159,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse: SendRespon
     return true;
 });
 
-// 监听页面导航变化
-// 使用 history API 监听单页应用的路由变化
+/**
+ * Page Navigation Monitoring
+ * Patches browser History API to detect SPA navigation changes
+ * Notifies background script of any URL changes
+ */
 const originalPushState = history.pushState;
 const originalReplaceState = history.replaceState;
 const originalBack = history.back.bind(history);
@@ -160,17 +189,17 @@ history.forward = function (...args) {
     setTimeout(notifyPageUpdate, 100);
 };
 
-// 监听 popstate 事件（浏览器前进后退）
+/** Listens for browser back/forward navigation */
 window.addEventListener('popstate', () => {
     setTimeout(notifyPageUpdate, 100);
 });
 
-// 监听 hashchange 事件（hash 路由变化）
+/** Listens for hash-based route changes (common in SPAs) */
 window.addEventListener('hashchange', () => {
     setTimeout(notifyPageUpdate, 100);
 });
 
-// 监听页面标题变化
+/** Observes page title changes for dynamic content */
 const titleObserver = new MutationObserver(() => {
     setTimeout(notifyPageUpdate, 100);
 });
@@ -180,6 +209,11 @@ titleObserver.observe(document.querySelector('title') || document.head, {
     subtree: true
 });
 
+/**
+ * Periodic activity check
+ * Confirms tab is still active and updates last use time
+ * Runs every 30 seconds to maintain tab activity
+ */
 setInterval(() => {
     browser.runtime.sendMessage({ getTabActive: true }).then((res) => {
         const tabActive = res as Response;
@@ -191,7 +225,11 @@ setInterval(() => {
     });
 }, 1000 * 30); // 每30s更新一次 lastUseTime
 
-// 监听用户交互活动，实时重置倒计时
+/**
+ * User Activity Monitoring
+ * Listens for common user interaction events to reset the freeze timer
+ * Throttled to 5 seconds between updates to reduce message traffic
+ */
 const userActivityEvents = [
     'mousedown', 'click', 'keydown', 'scroll', 'touchstart', 'mousemove'
 ];
@@ -214,7 +252,10 @@ userActivityEvents.forEach(eventType => {
     }, { passive: true });
 });
 
-// 监听页面滚动（更频繁的活动）
+/**
+ * Scroll activity monitoring with separate throttle
+ * Scroll events can fire very frequently, so they use a 2-second throttle
+ */
 let scrollThrottle = false;
 window.addEventListener('scroll', () => {
     if (!scrollThrottle) {
@@ -231,7 +272,10 @@ window.addEventListener('scroll', () => {
     }
 }, { passive: true });
 
-// 如果当前页面即将被关闭，通知 background script 删除当前 tab
+/**
+ * Cleanup on page unload
+ * Notifies background script to remove this tab from tracking
+ */
 window.addEventListener('beforeunload', () => {
     browser.runtime.sendMessage({ DeleteTab: true });
 });
