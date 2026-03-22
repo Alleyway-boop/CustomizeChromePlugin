@@ -629,21 +629,54 @@ function isTabFrozen(tabId: number): boolean {
   return freezeTabStatusList.some(tab => tab.tabId === tabId);
 }
 
+/** saveFreeTab 防抖定时器 */
+let saveFreeTabTimeout: number | null = null;
+/** 防抖延迟：500ms内多次调用只执行一次存储 */
+const SAVE_FREE_TAB_DEBOUNCE_MS = 500;
+
 /**
- * Saves the current freeze tab status list to storage
- * BUG-010修复：添加错误处理，避免存储写入失败时无感知
- *
- * @returns Promise that resolves when data is saved
- *
- * @example
- * await saveFreeTab();
+ * 刷新保存冻结标签页状态（立即执行，不防抖）
+ * 用于需要立即保存的场景（如页面卸载前）
  */
-async function saveFreeTab() {
+async function flushSaveFreeTab() {
+  if (saveFreeTabTimeout !== null) {
+    clearTimeout(saveFreeTabTimeout);
+    saveFreeTabTimeout = null;
+  }
+  await doSaveFreeTab();
+}
+
+/**
+ * 执行实际的存储操作
+ */
+async function doSaveFreeTab() {
   try {
     await browser.storage.sync.set({ 'freezeTabStatusList': freezeTabStatusList });
   } catch (error) {
     console.error('Error saving freeze tab status:', error);
   }
+}
+
+/**
+ * Saves the current freeze tab status list to storage
+ * BUG-010修复：添加错误处理，避免存储写入失败时无感知
+ * 性能优化：使用防抖机制批量处理多次快速调用
+ *
+ * @returns void（立即返回，实际保存会延迟执行）
+ *
+ * @example
+ * saveFreeTab(); // 多次调用会被防抖合并
+ */
+function saveFreeTab() {
+  // 如果已有待执行的保存，取消并重新计时（防抖）
+  if (saveFreeTabTimeout !== null) {
+    clearTimeout(saveFreeTabTimeout);
+  }
+
+  saveFreeTabTimeout = window.setTimeout(async () => {
+    saveFreeTabTimeout = null;
+    await doSaveFreeTab();
+  }, SAVE_FREE_TAB_DEBOUNCE_MS);
 }
 
 // SmartScheduler实例：性能优化，使用智能调度器替代setInterval
@@ -660,9 +693,10 @@ smartScheduler.addTask('cleanupFrozenTabs', async () => {
 
 smartScheduler.start(1000); // 每秒检查一次是否有任务需要执行
 
-// BUG-013: 扩展卸载时清理 scheduler
-browser.runtime.onSuspend.addListener(() => {
+// BUG-013: 扩展卸载时清理 scheduler 并刷新待保存的数据
+browser.runtime.onSuspend.addListener(async () => {
   smartScheduler.stop();
+  await flushSaveFreeTab();
 });
 
 /**
