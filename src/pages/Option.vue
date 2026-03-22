@@ -311,51 +311,38 @@ function onChange({ file, fileList }: { file: any, fileList: any[] }) {
             </div>
         </NModal>
 
-        <!-- 快捷键设置提示 - 玻璃拟态科技感设计 -->
+        <!-- 快捷键设置提示 -->
         <div v-if="!url && !title" class="fixed bottom-6 right-6 z-20">
-            <div class="relative group">
-                <!-- 渐变发光边框 -->
-                <div class="absolute -inset-0.5 bg-gradient-to-r from-cyan-400/50 via-blue-500/50 to-indigo-500/50 rounded-2xl blur-sm opacity-40 group-hover:opacity-60 transition-all duration-500"></div>
-                <!-- 主卡片 -->
-                <div class="relative bg-slate-700/50 backdrop-blur-xl rounded-2xl p-4 border border-white/10 shadow-2xl max-w-sm overflow-hidden">
-                    <!-- 内部光泽效果 -->
-                    <div class="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-transparent"></div>
-                    <!-- 顶部高光线 -->
-                    <div class="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent"></div>
-
-                    <div class="relative flex items-start space-x-3">
-                        <!-- 图标容器 -->
-                        <div class="relative flex-shrink-0">
-                            <div class="absolute inset-0 bg-gradient-to-br from-cyan-400/30 to-blue-500/30 rounded-xl blur-md opacity-60"></div>
-                            <div class="relative bg-gradient-to-br from-cyan-500/20 to-blue-600/20 backdrop-blur-sm rounded-xl p-2.5 border border-cyan-400/20">
-                                <div class="i-carbon-keyboard text-cyan-300 text-lg"></div>
+            <div class="bg-slate-700/60 backdrop-blur-xl rounded-xl p-4 border border-slate-600/40 shadow-2xl max-w-sm">
+                <div class="flex items-start space-x-3">
+                    <div class="bg-gradient-to-br from-cyan-400/20 to-blue-400/20 rounded-lg p-2 flex-shrink-0">
+                        <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-white text-sm font-medium mb-2">键盘快捷键</h4>
+                        <div class="space-y-1.5 text-xs text-slate-300/80 font-light">
+                            <div class="flex justify-between items-center">
+                                <span>冻结当前标签页</span>
+                                <kbd class="px-1.5 py-0.5 bg-slate-600/50 rounded text-slate-200 text-xs">Ctrl+Shift+F</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>解冻所有标签页</span>
+                                <kbd class="px-1.5 py-0.5 bg-slate-600/50 rounded text-slate-200 text-xs">Ctrl+Shift+U</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>添加网站到白名单</span>
+                                <kbd class="px-1.5 py-0.5 bg-slate-600/50 rounded text-slate-200 text-xs">Ctrl+Shift+W</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>打开弹出窗口</span>
+                                <kbd class="px-1.5 py-0.5 bg-slate-600/50 rounded text-slate-200 text-xs">Ctrl+Shift+S</kbd>
                             </div>
                         </div>
-
-                        <div class="flex-1 min-w-0">
-                            <h4 class="text-white/90 text-sm font-semibold mb-3 tracking-wide">键盘快捷键</h4>
-                            <div class="space-y-2">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-slate-300/80 text-xs">冻结当前标签页</span>
-                                    <kbd class="px-2 py-1 bg-gradient-to-r from-slate-600/60 to-slate-500/60 backdrop-blur-sm rounded-lg text-slate-100 text-xs font-mono border border-slate-400/20 shadow-sm">Ctrl+Shift+F</kbd>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-slate-300/80 text-xs">解冻所有标签页</span>
-                                    <kbd class="px-2 py-1 bg-gradient-to-r from-slate-600/60 to-slate-500/60 backdrop-blur-sm rounded-lg text-slate-100 text-xs font-mono border border-slate-400/20 shadow-sm">Ctrl+Shift+U</kbd>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-slate-300/80 text-xs">添加网站到白名单</span>
-                                    <kbd class="px-2 py-1 bg-gradient-to-r from-slate-600/60 to-slate-500/60 backdrop-blur-sm rounded-lg text-slate-100 text-xs font-mono border border-slate-400/20 shadow-sm">Ctrl+Shift+W</kbd>
-                                </div>
-                                <div class="flex justify-between items-center">
-                                    <span class="text-slate-300/80 text-xs">打开弹出窗口</span>
-                                    <kbd class="px-2 py-1 bg-gradient-to-r from-slate-600/60 to-slate-500/60 backdrop-blur-sm rounded-lg text-slate-100 text-xs font-mono border border-slate-400/20 shadow-sm">Ctrl+Shift+S</kbd>
-                                </div>
-                            </div>
-                            <p class="text-slate-400/60 text-xs mt-3 font-light">
-                                在 Chrome 扩展页面管理快捷键
-                            </p>
-                        </div>
+                        <p class="text-slate-400/60 text-xs mt-3 font-light">
+                            在 Chrome 扩展页面管理快捷键
+                        </p>
                     </div>
                 </div>
             </div>

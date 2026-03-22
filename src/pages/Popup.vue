@@ -11,36 +11,9 @@
         <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">Tab
           Manager</h1>
       </div>
-      <div class="flex items-center gap-2">
-        <!-- 搜索输入框 - 科技感设计 -->
-        <div class="relative group">
-          <!-- 发光效果背景 -->
-          <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 rounded-xl opacity-30 group-hover:opacity-50 blur-sm transition-all duration-300"></div>
-          <div class="relative flex items-center">
-            <input
-              ref="searchInputRef"
-              v-model="searchQuery"
-              type="text"
-              placeholder="搜索标签页..."
-              class="w-36 px-3 py-1.5 pl-9 pr-8 text-sm bg-white/80 backdrop-blur-sm border border-transparent rounded-xl focus:outline-none focus:bg-white/90 focus:shadow-lg transition-all duration-300"
-              @keydown.escape="clearSearch"
-            />
-            <!-- 搜索图标 -->
-            <div class="absolute left-2.5 top-1/2 -translate-y-1/2 i-carbon-search text-indigo-500/70 text-sm transition-colors duration-200 group-hover:text-indigo-600"></div>
-            <!-- 清除按钮 -->
-            <button
-              v-if="searchQuery"
-              @click="clearSearch"
-              class="absolute right-1.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200 hover:scale-110"
-            >
-              <div class="i-carbon-close text-white text-[10px]"></div>
-            </button>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 px-2 py-1 bg-amber-100/80 rounded-full">
-          <div class="i-carbon-warning-alt text-amber-600 text-sm animate-pulse"></div>
-          <span class="text-xs font-medium text-amber-700">Auto Freeze</span>
-        </div>
+      <div class="flex items-center gap-2 px-2 py-1 bg-amber-100/80 rounded-full">
+        <div class="i-carbon-warning-alt text-amber-600 text-sm animate-pulse"></div>
+        <span class="text-xs font-medium text-amber-700">Auto Freeze</span>
       </div>
     </div>
 
@@ -80,19 +53,12 @@
           <template #header-extra>
             <div class="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full">
               <div class="i-carbon-fire text-white text-sm animate-pulse"></div>
-              <span class="text-xs font-bold text-white">{{ searchQuery ? filteredTabStatusList.length + '/' : '' }}{{ TabStatusList.length }}</span>
+              <span class="text-xs font-bold text-white">{{ TabStatusList.length }}</span>
             </div>
           </template>
 
           <div class="flex flex-col gap-2 p-3">
-            <!-- 搜索结果提示 -->
-            <div v-if="searchQuery && filteredTabStatusList.length === 0" class="flex flex-col items-center justify-center py-6 text-center">
-              <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-2">
-                <div class="i-carbon-search text-gray-400 text-xl"></div>
-              </div>
-              <p class="text-sm text-gray-500">未找到匹配的标签页</p>
-            </div>
-            <div v-for="(item, index) in filteredTabStatusList" :key="index" @click="GotoTab(item.tabId)"
+            <div v-for="(item, index) in TabStatusList" :key="index" @click="GotoTab(item.tabId)"
               class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg"
               :class="{
                 'border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50 hover:border-sky-300 hover:shadow-sky-100/50': item.remainingMinutes === -1,
@@ -131,9 +97,9 @@
                   <!-- 标题和时间 -->
                   <div class="flex items-center justify-between mb-3">
                     <h3
-                      class="font-semibold text-sm text-gray-900 truncate pr-2 group-hover:text-indigo-600 transition-colors"
-                      v-html="highlightText(item.title || 'Unknown Page', searchQuery)"
-                    ></h3>
+                      class="font-semibold text-sm text-gray-900 truncate pr-2 group-hover:text-indigo-600 transition-colors">
+                      {{ item.title || 'Unknown Page' }}
+                    </h3>
                     <div class="flex items-center gap-2 flex-shrink-0">
                       <!-- 状态指示器 -->
                       <div class="relative">
@@ -220,20 +186,13 @@
               <!-- 冻结计数 -->
               <div class="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full">
                 <div class="i-carbon-snowflake text-white text-sm"></div>
-                <span class="text-xs font-bold text-white">{{ searchQuery ? filteredFreezeTabStatusList.length + '/' : '' }}{{ freezeTabStatusList.length }}</span>
+                <span class="text-xs font-bold text-white">{{ freezeTabStatusList.length }}</span>
               </div>
             </div>
           </template>
 
           <div class="flex flex-col gap-2 p-3">
-            <!-- 搜索结果提示 -->
-            <div v-if="searchQuery && filteredFreezeTabStatusList.length === 0" class="flex flex-col items-center justify-center py-6 text-center">
-              <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-2">
-                <div class="i-carbon-search text-gray-400 text-xl"></div>
-              </div>
-              <p class="text-sm text-gray-500">未找到匹配的标签页</p>
-            </div>
-            <div v-for="(item, index) in filteredFreezeTabStatusList" :key="index" @click="GotoTab(item.tabId)"
+            <div v-for="(item, index) in freezeTabStatusList" :key="index" @click="GotoTab(item.tabId)"
               class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 hover:border-cyan-300 hover:shadow-cyan-100/50">
 
               <!-- 冰霜效果背景 -->
@@ -265,10 +224,10 @@
                 <!-- 内容 -->
                 <div class="flex-1 min-w-0">
                   <h4
-                    class="font-semibold text-sm text-gray-900 truncate mb-1 group-hover:text-blue-600 transition-colors"
-                    v-html="highlightText(item.title, searchQuery)"
-                  ></h4>
-                  <p class="text-xs text-gray-500 truncate mb-2" v-html="highlightText(item.url, searchQuery)"></p>
+                    class="font-semibold text-sm text-gray-900 truncate mb-1 group-hover:text-blue-600 transition-colors">
+                    {{ item.title }}
+                  </h4>
+                  <p class="text-xs text-gray-500 truncate mb-2">{{ item.url }}</p>
 
                   <!-- 状态信息 -->
                   <div class="flex items-center justify-between">
@@ -303,10 +262,9 @@
 
 <script lang="ts" setup>
 import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NScrollbar } from 'naive-ui';
-import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import browser from 'webextension-polyfill';
 import type { TabStatus, FreezeTabStatus, Message, Response, SendResponse } from '../utils';
-import { debounce } from '../utils/performance';
 
 // 扩展 TabStatus 接口包含剩余时间
 interface ExtendedTabStatus extends TabStatus {
@@ -317,68 +275,10 @@ const FreezePinned = ref<boolean>();
 const FreezeTimeout = ref<number>();
 const TabStatusList = ref<ExtendedTabStatus[]>([]);
 const freezeTabStatusList = ref<FreezeTabStatus[]>([]);
-const searchQuery = ref('');
-const debouncedSearchQuery = ref('');
 let updateTimer: number | null = null;
 let lastTabStatusHash: string = ''; // 用于检测状态变化
 let updateInterval = 3000; // 默认更新间隔
 let noChangeCount = 0; // 连续无变化次数计数器
-const searchInputRef = ref<HTMLInputElement | null>(null);
-
-// 防抖搜索
-const updateDebouncedSearch = debounce((query: string) => {
-  debouncedSearchQuery.value = query;
-}, 300);
-
-// 监听搜索输入
-watch(searchQuery, (newQuery) => {
-  updateDebouncedSearch(newQuery);
-});
-
-// 清除搜索
-function clearSearch() {
-  searchQuery.value = '';
-  debouncedSearchQuery.value = '';
-  searchInputRef.value?.blur();
-}
-
-// 高亮文本
-function highlightText(text: string, query: string): string {
-  if (!query || !text) return text;
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(${escapedQuery})`, 'gi');
-  return text.replace(regex, '<mark class="bg-yellow-200 text-yellow-900 rounded px-0.5">$1</mark>');
-}
-
-// 过滤标签页列表
-function filterTabStatusList(list: ExtendedTabStatus[], query: string): ExtendedTabStatus[] {
-  if (!query || query.trim() === '') {
-    return list;
-  }
-  const searchLower = query.toLowerCase().trim();
-  return list.filter(item => {
-    const titleMatch = item.title?.toLowerCase().includes(searchLower);
-    const urlMatch = item.url?.toLowerCase().includes(searchLower);
-    return titleMatch || urlMatch;
-  });
-}
-
-// 过滤冻结标签页列表
-function filterFreezeTabStatusList(list: FreezeTabStatus[], query: string): FreezeTabStatus[] {
-  if (!query || query.trim() === '') {
-    return list;
-  }
-  const searchLower = query.toLowerCase().trim();
-  return list.filter(item => {
-    const titleMatch = item.title?.toLowerCase().includes(searchLower);
-    const urlMatch = item.url?.toLowerCase().includes(searchLower);
-    return titleMatch || urlMatch;
-  });
-}
-
-// 计算属性
-const filteredTabStatusList = computed(() => filterTabStatusList(TabStatusList.value, debouncedSearchQuery.value));
-const filteredFreezeTabStatusList = computed(() => filterFreezeTabStatusList(freezeTabStatusList.value, debouncedSearchQuery.value));
 
 // 格式化剩余时间显示
 function formatRemainingTime(minutes: number): string {
