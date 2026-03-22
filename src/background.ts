@@ -77,7 +77,7 @@ async function validateAndCleanWhitelist(inputWhitelist: unknown): Promise<strin
 }
 
 // 初始化
-browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then(async (res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[] }) => {
+browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist', 'autoRecovery']).then(async (res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[]; autoRecovery?: boolean }) => {
   if (res.FreezeTimeout) FreezeTimeout = res.FreezeTimeout;
   if (res.FreezePinned !== undefined) FreezePinned.value = res.FreezePinned;
 
@@ -101,6 +101,13 @@ browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then(as
   }
 
   console.log('Initial config:', { FreezeTimeout, FreezePinned, whitelist });
+
+  // autoRecovery: 扩展加载时自动恢复所有冻结的标签页
+  if (res.autoRecovery === true) {
+    console.log('Auto-recovery enabled, restoring frozen tabs...');
+    const result = await restoreAllFrozenTabs();
+    console.log('Auto-recovery result:', result);
+  }
 });
 
 // 监听存储变化
