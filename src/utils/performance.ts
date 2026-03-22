@@ -21,7 +21,7 @@ import { safeAsync } from './error-handler';
  *
  * debouncedSearch('test'); // Only executes after 300ms of no calls
  */
-export function debounce<T extends (...args: unknown[]) => unknown>(
+export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -31,7 +31,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
     if (timeout) {
       clearTimeout(timeout);
     }
-    
+
     timeout = setTimeout(() => {
       func(...args);
     }, wait);
