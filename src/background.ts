@@ -4,6 +4,13 @@ import { Message, SendResponse } from './utils';
 import { safeAsync, safeStorage, safeTabs, ExtensionError, ErrorCodes, isValidDomain, normalizeDomain } from './utils/error-handler';
 import { SmartScheduler } from './utils/performance';
 import { configManager } from './utils/config';
+import { isDomainMatch, domainsToWhitelistItems } from './utils/whitelist-utils';
+import type { WhitelistItem } from './types/whitelist';
+
+// 常量定义 - 避免魔法数字
+const CHECK_INTERVAL_MS = 60 * 1000; // 每分钟检查一次冻结
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 每小时清理一次冻结标签页
+const TAB_UPDATE_DEBOUNCE_MS = 500; // 标签页更新去重时间
 
 // 配置和状态
 let whitelist: string[] = [];
@@ -79,14 +86,15 @@ browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then(as
     const cleanedWhitelist = await validateAndCleanWhitelist(res.whitelist);
     whitelist = cleanedWhitelist;
 
-    // 如果清理过程中移除了无效数据，保存清理后的结果
+    // 如果清理过程中移除了无效数据，仅记录日志，不在这里保存
+    // 避免循环：存储监听器会处理后续的保存操作
     if (cleanedWhitelist.length !== res.whitelist.length) {
       console.log('Cleaned whitelist data during initialization:', {
         original: res.whitelist.length,
         cleaned: cleanedWhitelist.length,
         removed: res.whitelist.length - cleanedWhitelist.length
       });
-      await safeStorage.set({ whitelist: cleanedWhitelist });
+      // 不再保存，由 storage 监听器统一处理
     }
   } else {
     whitelist = [];
@@ -126,8 +134,16 @@ browser.storage.sync.get('freezeTabStatusList').then((res) => {
   }
 });
 
+// BUG-006: 用于 onUpdated 去重的 Set
+const recentlyUpdatedTabs = new Set<number>();
+
 // 监听标签页更新事件（包括URL变化）
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // BUG-006: 去重逻辑 - 如果tab已在最近更新列表中，跳过
+  if (recentlyUpdatedTabs.has(tabId)) {
+    return;
+  }
+
   if (changeInfo.url || changeInfo.title) {
     // 如果URL或标题发生变化，更新tabStatusList中的信息
     const tabStatus = tabStatusList.find(item => item.tabId === tabId);
@@ -144,6 +160,12 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         tabStatus.icon = changeInfo.favIconUrl;
       }
     }
+
+    // BUG-006: 添加到最近更新列表，debounce时间后自动移除
+    recentlyUpdatedTabs.add(tabId);
+    setTimeout(() => {
+      recentlyUpdatedTabs.delete(tabId);
+    }, TAB_UPDATE_DEBOUNCE_MS);
   }
 });
 
@@ -417,6 +439,17 @@ async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: stri
 }
 
 /**
+ * Checks if a domain matches any whitelist entry with wildcard support
+ *
+ * @param domain - The domain to check
+ * @returns true if the domain matches a whitelist entry
+ */
+function isDomainInWhitelist(domain: string): boolean {
+  const whitelistItems = domainsToWhitelistItems(whitelist);
+  return whitelistItems.some(item => isDomainMatch(domain, item));
+}
+
+/**
  * Checks all tracked tabs and freezes those that have exceeded the timeout
  * Skips active, visible, and whitelisted tabs
  * Uses Page Visibility API state to determine actual visibility
@@ -438,11 +471,22 @@ async function checkAndFreezeTabs() {
     .filter(tab => tab.isVisible === true && tab.visibilityState === 'visible')
     .map(tab => tab.tabId);
 
+  // BUG-001修复：先收集待冻结的tabId，避免在遍历时修改数组
+  const tabsToFreeze: number[] = [];
+
   for (const item of tabStatusList) {
     if (isTabFrozen(item.tabId)) continue;
 
-    const itemUrl = new URL(item.url).hostname;
-    if (whitelist.includes(itemUrl)) continue;
+    let itemHostname: string;
+    try {
+      itemHostname = new URL(item.url).hostname;
+    } catch (error) {
+      console.warn('Invalid URL in tab status, skipping:', item.url, error);
+      continue;
+    }
+
+    // BUG-009修复：使用通配符匹配的whitelist检查
+    if (isDomainInWhitelist(itemHostname)) continue;
 
     // 🔒 关键修复：多重保护机制防止误冻结
     const isCurrentlyActive = activeTabIds.has(item.tabId);
@@ -468,8 +512,13 @@ async function checkAndFreezeTabs() {
         timeout: Math.round(timeout / 1000),
         url: item.url
       });
-      FreezeTab(item.tabId);
+      tabsToFreeze.push(item.tabId);
     }
+  }
+
+  // 统一处理冻结，避免在遍历时修改数组
+  for (const tabId of tabsToFreeze) {
+    FreezeTab(tabId);
   }
 }
 
@@ -575,6 +624,7 @@ function isTabFrozen(tabId: number): boolean {
 
 /**
  * Saves the current freeze tab status list to storage
+ * BUG-010修复：添加错误处理，避免存储写入失败时无感知
  *
  * @returns Promise that resolves when data is saved
  *
@@ -582,15 +632,31 @@ function isTabFrozen(tabId: number): boolean {
  * await saveFreeTab();
  */
 async function saveFreeTab() {
-  await browser.storage.sync.set({ 'freezeTabStatusList': freezeTabStatusList });
+  try {
+    await browser.storage.sync.set({ 'freezeTabStatusList': freezeTabStatusList });
+  } catch (error) {
+    console.error('Error saving freeze tab status:', error);
+  }
 }
 
-// 定期检查是否需要冻结标签页
-setInterval(() => {
-  checkAndFreezeTabs().catch(error => {
-    console.error('Error in checkAndFreezeTabs:', error);
-  });
-}, 60000); // 每分钟检查一次
+// SmartScheduler实例：性能优化，使用智能调度器替代setInterval
+const smartScheduler = new SmartScheduler();
+
+// 性能优化：使用SmartScheduler替代setInterval
+smartScheduler.addTask('checkAndFreezeTabs', async () => {
+  await checkAndFreezeTabs();
+}, CHECK_INTERVAL_MS);
+
+smartScheduler.addTask('cleanupFrozenTabs', async () => {
+  await cleanupFrozenTabs();
+}, 3600000); // 每小时清理一次
+
+smartScheduler.start(1000); // 每秒检查一次是否有任务需要执行
+
+// BUG-013: 扩展卸载时清理 scheduler
+browser.runtime.onSuspend.addListener(() => {
+  smartScheduler.stop();
+});
 
 /**
  * Retrieves the current whitelist with validation
@@ -1208,6 +1274,9 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     return true;
   }
 
+  // BUG-004: 添加default分支处理未知消息类型
+  console.warn('Unknown message type received:', request);
+
   return true;
 });
 
@@ -1250,14 +1319,18 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
       break;
     case 'whitelist':
       if (tab.url) {
-        const url = new URL(tab.url).hostname;
-        addToWhitelist(url).then(result => {
-          if (result.success) {
-            console.log('Added from context menu:', result.message);
-          } else {
-            console.warn('Failed to add from context menu:', result.message);
-          }
-        });
+        try {
+          const url = new URL(tab.url).hostname;
+          addToWhitelist(url).then(result => {
+            if (result.success) {
+              console.log('Added from context menu:', result.message);
+            } else {
+              console.warn('Failed to add from context menu:', result.message);
+            }
+          });
+        } catch (error) {
+          console.warn('Invalid URL for context menu whitelist:', tab.url, error);
+        }
       }
       break;
   }
@@ -1272,15 +1345,11 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
  * @example
  * await cleanupFrozenTabs();
  */
-function cleanupFrozenTabs() {
-  browser.tabs.query({}).then(tabs => {
-    const currentTabIds = tabs.map(tab => tab.id);
-    freezeTabStatusList = freezeTabStatusList.filter(frozenTab =>
-      currentTabIds.includes(frozenTab.tabId)
-    );
-    saveFreeTab();
-  });
+async function cleanupFrozenTabs() {
+  const tabs = await browser.tabs.query({});
+  const currentTabIds = tabs.map(tab => tab.id);
+  freezeTabStatusList = freezeTabStatusList.filter(frozenTab =>
+    currentTabIds.includes(frozenTab.tabId)
+  );
+  saveFreeTab();
 }
-
-// 每小时清理一次
-setInterval(cleanupFrozenTabs, 3600000);

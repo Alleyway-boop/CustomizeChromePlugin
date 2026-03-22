@@ -11,6 +11,12 @@
 import browser from 'webextension-polyfill';
 import { SendResponse, Response, Message } from './utils/index';
 
+// 常量定义 - 避免魔法数字
+const PERIODIC_CHECK_INTERVAL_MS = 30 * 1000; // 每30秒更新一次 lastUseTime
+const ACTIVITY_THROTTLE_MS = 5 * 1000; // 5秒内只重置一次
+const SCROLL_THROTTLE_MS = 2 * 1000; // 2秒内只响应一次滚动
+const NOTIFY_DELAY_MS = 100; // 通知延迟时间
+
 /** Current tab ID assigned by background script */
 let currentTabId: number | null = null;
 /** Last tracked URL for change detection */
@@ -204,10 +210,16 @@ const titleObserver = new MutationObserver(() => {
     setTimeout(notifyPageUpdate, 100);
 });
 
-titleObserver.observe(document.querySelector('title') || document.head, {
-    childList: true,
-    subtree: true
-});
+// BUG-014: 添加 null 检查，避免在目标为 null 时抛出异常
+const titleTarget = document.querySelector('title') || document.head;
+if (titleTarget) {
+    titleObserver.observe(titleTarget, {
+        childList: true,
+        subtree: true
+    });
+} else {
+    console.warn('Could not find title element or head to observe');
+}
 
 /**
  * Periodic activity check
@@ -223,7 +235,7 @@ setInterval(() => {
             notifyPageUpdate();
         }
     });
-}, 1000 * 30); // 每30s更新一次 lastUseTime
+}, PERIODIC_CHECK_INTERVAL_MS);
 
 /**
  * User Activity Monitoring
@@ -235,12 +247,11 @@ const userActivityEvents = [
 ];
 
 let lastActivityTime = 0;
-const ACTIVITY_THROTTLE = 5000; // 5秒内只重置一次
 
 userActivityEvents.forEach(eventType => {
     document.addEventListener(eventType, () => {
         const now = Date.now();
-        if (now - lastActivityTime > ACTIVITY_THROTTLE) {
+        if (now - lastActivityTime > ACTIVITY_THROTTLE_MS) {
             lastActivityTime = now;
             console.log(`User activity detected: ${eventType}`);
 
@@ -268,7 +279,7 @@ window.addEventListener('scroll', () => {
 
         setTimeout(() => {
             scrollThrottle = false;
-        }, 2000); // 2秒内只响应一次滚动
+        }, SCROLL_THROTTLE_MS);
     }
 }, { passive: true });
 
@@ -278,4 +289,6 @@ window.addEventListener('scroll', () => {
  */
 window.addEventListener('beforeunload', () => {
     browser.runtime.sendMessage({ DeleteTab: true });
+    // 断开 MutationObserver 连接，避免内存泄漏
+    titleObserver.disconnect();
 });
