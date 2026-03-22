@@ -310,6 +310,43 @@ function onChange({ file, fileList }: { file: any, fileList: any[] }) {
                 </NUpload>
             </div>
         </NModal>
+
+        <!-- 快捷键设置提示 -->
+        <div v-if="!url && !title" class="fixed bottom-6 right-6 z-20">
+            <div class="bg-slate-700/60 backdrop-blur-xl rounded-xl p-4 border border-slate-600/40 shadow-2xl max-w-sm">
+                <div class="flex items-start space-x-3">
+                    <div class="bg-gradient-to-br from-cyan-400/20 to-blue-400/20 rounded-lg p-2 flex-shrink-0">
+                        <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-white text-sm font-medium mb-2">键盘快捷键</h4>
+                        <div class="space-y-1.5 text-xs text-slate-300/80 font-light">
+                            <div class="flex justify-between items-center">
+                                <span>冻结当前标签页</span>
+                                <kbd class="px-1.5 py-0.5 bg-slate-600/50 rounded text-slate-200 text-xs">Ctrl+Shift+F</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>解冻所有标签页</span>
+                                <kbd class="px-1.5 py-0.5 bg-slate-600/50 rounded text-slate-200 text-xs">Ctrl+Shift+U</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>添加网站到白名单</span>
+                                <kbd class="px-1.5 py-0.5 bg-slate-600/50 rounded text-slate-200 text-xs">Ctrl+Shift+W</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span>打开弹出窗口</span>
+                                <kbd class="px-1.5 py-0.5 bg-slate-600/50 rounded text-slate-200 text-xs">Ctrl+Shift+S</kbd>
+                            </div>
+                        </div>
+                        <p class="text-slate-400/60 text-xs mt-3 font-light">
+                            在 Chrome 扩展页面管理快捷键
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 

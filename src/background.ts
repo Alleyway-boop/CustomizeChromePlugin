@@ -1394,3 +1394,67 @@ async function cleanupFrozenTabs() {
   );
   saveFreeTab();
 }
+
+/**
+ * Handles keyboard command events from browser.commands API
+ * Executes the corresponding action based on the command name
+ *
+ * @param command - The command identifier (e.g., 'freeze-current-tab')
+ *
+ * @example
+ * // When user presses Ctrl+Shift+F
+ * // command will be 'freeze-current-tab'
+ */
+browser.commands.onCommand.addListener(async (command: string) => {
+  console.log('Keyboard command triggered:', command);
+
+  try {
+    switch (command) {
+      case 'freeze-current-tab': {
+        // 冻结当前标签页
+        const activeTabId = await getCurrentActiveTabId();
+        if (activeTabId !== null) {
+          await FreezeTab(activeTabId);
+          console.log('Frozen current tab via keyboard shortcut:', activeTabId);
+        }
+        break;
+      }
+
+      case 'unfreeze-all-tabs': {
+        // 解冻所有标签页
+        const result = await restoreAllFrozenTabs();
+        console.log('Unfroze all tabs via keyboard shortcut:', result);
+        break;
+      }
+
+      case 'add-to-whitelist': {
+        // 添加当前网站到白名单
+        const activeTabId = await getCurrentActiveTabId();
+        if (activeTabId !== null) {
+          const tab = await browser.tabs.get(activeTabId);
+          if (tab.url) {
+            const hostname = new URL(tab.url).hostname;
+            const result = await addToWhitelist(hostname);
+            console.log('Added to whitelist via keyboard shortcut:', {
+              hostname,
+              result
+            });
+          }
+        }
+        break;
+      }
+
+      case 'open-popup': {
+        // 打开弹出窗口 - 在 Chrome 中无法通过 API 主动打开 popup
+        // 但可以打开选项页面作为替代
+        console.log('Open popup command received - browser popup cannot be opened programmatically');
+        break;
+      }
+
+      default:
+        console.warn('Unknown keyboard command:', command);
+    }
+  } catch (error) {
+    console.error('Error handling keyboard command:', error);
+  }
+});

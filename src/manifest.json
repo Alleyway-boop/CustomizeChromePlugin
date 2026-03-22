@@ -43,5 +43,35 @@
   "options_ui": {
     "page": "src/options.html",
     "open_in_tab": true
+  },
+  "commands": {
+    "freeze-current-tab": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+F",
+        "mac": "Command+Shift+F"
+      },
+      "description": "冻结当前标签页"
+    },
+    "unfreeze-all-tabs": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+U",
+        "mac": "Command+Shift+U"
+      },
+      "description": "解冻所有标签页"
+    },
+    "add-to-whitelist": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+W",
+        "mac": "Command+Shift+W"
+      },
+      "description": "添加当前网站到白名单"
+    },
+    "open-popup": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "打开弹出窗口"
+    }
   }
 }
