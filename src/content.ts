@@ -16,6 +16,7 @@ const PERIODIC_CHECK_INTERVAL_MS = 30 * 1000; // 每30秒更新一次 lastUseTim
 const ACTIVITY_THROTTLE_MS = 5 * 1000; // 5秒内只重置一次
 const SCROLL_THROTTLE_MS = 2 * 1000; // 2秒内只响应一次滚动
 const NOTIFY_DELAY_MS = 100; // 通知延迟时间
+const NOTIFY_PAGE_UPDATE_DEBOUNCE_MS = 500; // notifyPageUpdate 防抖延迟
 
 /** Current tab ID assigned by background script */
 let currentTabId: number | null = null;
@@ -27,13 +28,32 @@ let currentVisibilityState: string = document.visibilityState;
 /** Last reported visibility state to prevent duplicate reports */
 let lastVisibilityReport: string = currentVisibilityState;
 
+/** notifyPageUpdate 防抖定时器 */
+let notifyPageUpdateTimeout: number | null = null;
+
 /**
  * Notifies background script of page URL or title changes
  * Only sends update if changes are detected to reduce message traffic
+ * 使用防抖避免短时间内多次调用
  */
 function notifyPageUpdate() {
     if (!currentTabId) return;
 
+    // 如果已有待执行的通知，取消并重新计时（防抖）
+    if (notifyPageUpdateTimeout !== null) {
+        clearTimeout(notifyPageUpdateTimeout);
+    }
+
+    notifyPageUpdateTimeout = window.setTimeout(() => {
+        notifyPageUpdateTimeout = null;
+        doNotifyPageUpdate();
+    }, NOTIFY_PAGE_UPDATE_DEBOUNCE_MS);
+}
+
+/**
+ * 执行实际的页面更新通知
+ */
+function doNotifyPageUpdate() {
     const currentUrl = window.location.href;
     const title = document.title;
 
