@@ -9,6 +9,10 @@ let lastUrl: string = window.location.href;
 let currentVisibilityState: string = document.visibilityState;
 let lastVisibilityReport: string = currentVisibilityState;
 
+// Memory leak fix: Store interval ID for cleanup
+let activityCheckInterval: number | null = null;
+const ACTIVITY_CHECK_INTERVAL_MS = 1000 * 30; // 30 seconds
+
 // 通知 background script 页面信息更新
 function notifyPageUpdate() {
     if (!currentTabId) return;
@@ -59,14 +63,67 @@ function notifyVisibilityChange() {
         browser.runtime.sendMessage({ UpDateLastUseTime: true }).catch(() => {
             // 忽略错误
         });
+        // Resume activity check when visible
+        resumeActivityCheck();
     } else {
         message = { SetPageHidden: true };
+        // Pause activity check when hidden to save resources
+        pauseActivityCheck();
     }
 
     browser.runtime.sendMessage(message).catch((error) => {
         // 忽略错误（可能扩展已卸载）
         console.warn('Failed to report visibility change:', error);
     });
+}
+
+// Memory leak fix: Activity check with proper cleanup
+function startActivityCheck() {
+    // Clear any existing interval first
+    if (activityCheckInterval !== null) {
+        clearInterval(activityCheckInterval);
+    }
+    
+    activityCheckInterval = window.setInterval(() => {
+        // Only send updates if page is visible to save resources
+        if (document.visibilityState === 'visible') {
+            browser.runtime.sendMessage({ getTabActive: true }).then((res) => {
+                const tabActive = res as Response;
+                if (tabActive.response) {
+                    browser.runtime.sendMessage({ UpDateLastUseTime: true });
+                    // 定期检查页面信息变化
+                    notifyPageUpdate();
+                }
+            }).catch(() => {
+                // Ignore errors - page might be closed
+            });
+        }
+    }, ACTIVITY_CHECK_INTERVAL_MS);
+}
+
+function stopActivityCheck() {
+    if (activityCheckInterval !== null) {
+        clearInterval(activityCheckInterval);
+        activityCheckInterval = null;
+        console.log('Activity check interval stopped');
+    }
+}
+
+function pauseActivityCheck() {
+    // Pause the interval by clearing it - it will be resumed when page becomes visible
+    if (activityCheckInterval !== null) {
+        clearInterval(activityCheckInterval);
+        activityCheckInterval = null;
+        console.log('Activity check paused');
+    }
+}
+
+function resumeActivityCheck() {
+    // Only restart if not already running
+    if (activityCheckInterval === null) {
+        startActivityCheck();
+        console.log('Activity check resumed');
+    }
 }
 
 // init content script
@@ -78,9 +135,17 @@ browser.runtime.sendMessage({ getTabId: true }).then((tabId) => {
         notifyPageUpdate();
         // 初始报告页面可见性状态
         notifyVisibilityChange();
+        // Start activity check
+        startActivityCheck();
     }, 1000);
 }).catch(() => {
     // 忽略错误
+});
+
+// Memory leak fix: Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    stopActivityCheck();
+    browser.runtime.sendMessage({ DeleteTab: true });
 });
 
 // 添加 Page Visibility API 监听器
@@ -180,16 +245,8 @@ titleObserver.observe(document.querySelector('title') || document.head, {
     subtree: true
 });
 
-setInterval(() => {
-    browser.runtime.sendMessage({ getTabActive: true }).then((res) => {
-        const tabActive = res as Response;
-        if (tabActive.response) {
-            browser.runtime.sendMessage({ UpDateLastUseTime: true });
-            // 定期检查页面信息变化
-            notifyPageUpdate();
-        }
-    });
-}, 1000 * 30); // 每30s更新一次 lastUseTime
+// Note: The old setInterval has been replaced by startActivityCheck() 
+// which is started during initialization and properly cleaned up on page unload.
 
 // 监听用户交互活动，实时重置倒计时
 const userActivityEvents = [
@@ -230,8 +287,3 @@ window.addEventListener('scroll', () => {
         }, 2000); // 2秒内只响应一次滚动
     }
 }, { passive: true });
-
-// 如果当前页面即将被关闭，通知 background script 删除当前 tab
-window.addEventListener('beforeunload', () => {
-    browser.runtime.sendMessage({ DeleteTab: true });
-});

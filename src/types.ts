@@ -1,5 +1,6 @@
-// Re-export types from types.ts for backwards compatibility
-export type { Message, Response, SendResponse, TabStatus, FreezeTabStatus } from '../types';
+/**
+ * Shared TypeScript interfaces for the extension
+ */
 
 // Tab status for active tabs
 export interface TabStatus {
@@ -22,7 +23,7 @@ export interface FreezeTabStatus {
   title: string;
 }
 
-// Message types
+// Message types for background script communication
 export interface Message {
   greeting?: string;
   async?: boolean;
@@ -56,10 +57,43 @@ export interface Message {
 }
 
 // Response types
+export interface PageInfoResponse {
+  url?: string;
+  title?: string;
+}
+
+export interface RestoreAllResult {
+  success: boolean;
+  message: string;
+  restoredCount: number;
+}
+
+export type ResponseData = string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | PageInfoResponse | RestoreAllResult | number[];
+
 export interface Response {
-  response: string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | { url?: string; title?: string } | { success: boolean; message: string } | number[];
+  response: ResponseData;
   tabId?: number;
   error?: string;
 }
 
 export type SendResponse = (response?: Response) => void;
+
+// Extended tab status with remaining time (for UI)
+export interface ExtendedTabStatus extends TabStatus {
+  remainingMinutes: number;
+}
+
+// Storage types
+export interface StorageConfig {
+  FreezeTimeout?: number;
+  FreezePinned?: boolean;
+  whitelist?: string[];
+  freezeTabStatusList?: FreezeTabStatus[];
+  backgroundImage?: string;
+}
+
+// Whitelist operation result
+export interface WhitelistOperationResult {
+  success: boolean;
+  message: string;
+}

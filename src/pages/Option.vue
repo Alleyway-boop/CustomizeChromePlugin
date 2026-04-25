@@ -11,6 +11,7 @@ import {
 } from "naive-ui";
 import browser from "webextension-polyfill";
 import { useElementHover } from "@vueuse/core";
+import type { FreezeTabStatus } from "../utils";
 
 // 安全的 URL 解码函数
 function decodeURIComponentSafe(encoded: string): string {
@@ -61,12 +62,12 @@ onMounted(() => {
     console.log("Icon:", icon.value);
 
     // 监听来自背景脚本的消息
-    browser.runtime.onMessage.addListener((message: any) => {
+    browser.runtime.onMessage.addListener((message: { type?: string; snapshot?: string }) => {
         if (message.type === "setSnapshot") {
             snapshot.value = message.snapshot;
         }
     });
-    browser.storage.local.get("backgroundImage").then((result: any) => {
+    browser.storage.local.get("backgroundImage").then((result: { backgroundImage?: string }) => {
         if (result.backgroundImage) {
             background.value = result.backgroundImage;
             document.body.style.backgroundImage = `url(${background.value})`;
@@ -87,7 +88,7 @@ function normalizeUrl(inputUrl: string): string {
 }
 
 // 更可靠的匹配函数
-function findFreezeTabByUrl(targetUrl: string, freezeTabs: any[]): any | null {
+function findFreezeTabByUrl(targetUrl: string, freezeTabs: FreezeTabStatus[]): FreezeTabStatus | null {
     if (!freezeTabs || freezeTabs.length === 0) return null;
 
     const normalizedTarget = normalizeUrl(targetUrl);
@@ -120,7 +121,7 @@ function BackSource() {
     window.location.href = url.value;
 
     // 通知移除freezeTab - 使用更可靠的匹配机制
-    browser.storage.sync.get('freezeTabStatusList').then((result: any) => {
+    browser.storage.sync.get('freezeTabStatusList').then((result: { freezeTabStatusList?: FreezeTabStatus[] }) => {
         if (!result.freezeTabStatusList) {
             console.log('No freezeTabStatusList found');
             return;
@@ -137,7 +138,7 @@ function BackSource() {
         } else {
             console.warn('No matching freeze tab found for URL:', url.value);
             // 如果找不到匹配项，尝试通过标题匹配
-            const titleMatch = result.freezeTabStatusList.find((item: any) =>
+            const titleMatch = result.freezeTabStatusList.find((item: FreezeTabStatus) =>
                 item.title === title.value
             );
             if (titleMatch) {
@@ -178,7 +179,7 @@ function SaveBackgroundImage(file: UploadSettledFileInfo) {
     };
     reader.readAsDataURL(file.file!);
 }
-function onChange({ file, fileList }: { file: any, fileList: any[] }) {
+function onChange({ file, fileList }: { file: UploadFileInfo; fileList: UploadFileInfo[] }) {
     console.log("onChange:", { file, fileList });
 }
 </script>

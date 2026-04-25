@@ -44,7 +44,7 @@ export class ConfigManager {
 
   async initialize(): Promise<void> {
     try {
-      const stored = await safeStorage.get<any>([
+      const stored = await safeStorage.get<number | boolean | string[] | undefined>([
         'freezeTimeout',
         'freezePinned',
         'whitelist',
@@ -169,9 +169,9 @@ export class ConfigManager {
         let needsUpdate = false;
         const updates: Partial<AppConfig> = {};
 
-        Object.entries(changes).forEach(([key, change]: [string, any]) => {
+        Object.entries(changes).forEach(([key, change]: [string, { newValue: unknown }]) => {
           if (key in this.config) {
-            (updates as any)[key] = change.newValue;
+            (updates as Record<string, unknown>)[key] = change.newValue;
             needsUpdate = true;
           }
         });

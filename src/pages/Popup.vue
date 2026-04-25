@@ -265,6 +265,7 @@ import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NScrollbar } from 'nai
 import { onMounted, onUnmounted, ref } from 'vue';
 import browser from 'webextension-polyfill';
 import type { TabStatus, FreezeTabStatus, Message, Response, SendResponse } from '../utils';
+import type { ExtendedTabStatus, RestoreAllResult } from '../types';
 
 // 扩展 TabStatus 接口包含剩余时间
 interface ExtendedTabStatus extends TabStatus {
@@ -320,7 +321,7 @@ function calculateTabStatusHash(tabList: ExtendedTabStatus[]): string {
 
 // 智能更新标签页时间信息
 function updateTabTimes() {
-  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: any) => {
+  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: Response) => {
     if (response && response.response) {
       const newTabList = response.response as ExtendedTabStatus[];
       const currentHash = calculateTabStatusHash(newTabList);
@@ -434,11 +435,11 @@ function getFreezeTimeout() {
 }
 
 const GetAllTabStatusList = () => {
-  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: any) => {
-    TabStatusList.value = response.response;
+  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: Response) => {
+    TabStatusList.value = response.response as ExtendedTabStatus[];
   });
-  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: any) => {
-    freezeTabStatusList.value = response.response;
+  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: Response) => {
+    freezeTabStatusList.value = response.response as FreezeTabStatus[];
   });
 };
 
@@ -447,18 +448,18 @@ const GotoTab = (tabId: number) => {
 };
 
 const GetFreezeTabList = () => {
-  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: any) => {
-    freezeTabStatusList.value = response.response;
+  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: Response) => {
+    freezeTabStatusList.value = response.response as FreezeTabStatus[];
   });
 };
 
 // 恢复所有冻结的标签页
 const restoreAllFrozenTabs = async () => {
   try {
-    const response: any = await browser.runtime.sendMessage({ RestoreAllFrozenTabs: true });
+    const response = await browser.runtime.sendMessage({ RestoreAllFrozenTabs: true }) as Response;
 
     if (response && response.response) {
-      const result = response.response;
+      const result = response.response as RestoreAllResult;
 
       if (result.success) {
         // 更新冻结列表
