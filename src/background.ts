@@ -370,18 +370,45 @@ async function FreezeTab(tabId: number) {
     let latestUrl = tab.url || '';
     let latestTitle = tab.title || '';
 
+    // 检查 URL 是否为有效的原始页面（非 freeze page / chrome:// / javascript: 等）
+    const isValidOriginalUrl = (url: string): boolean => {
+      if (!url) return false;
+      try {
+        const u = new URL(url);
+        // 排除 freeze page、chrome 内部页面、扩展页面
+        if (u.protocol === 'javascript:' || u.protocol === 'chrome:' || u.protocol === 'file:') return false;
+        // 排除已经是 freeze page 的 URL
+        if (u.pathname.includes('options.html') && u.search.includes('url=')) return false;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     try {
       const pageInfoResponse = await browser.tabs.sendMessage(tabId, { type: 'getPageInfo' });
       const pageInfo = pageInfoResponse as { response?: { url?: string; title?: string } };
       if (pageInfo && pageInfo.response && typeof pageInfo.response === 'object') {
         const responseObj = pageInfo.response as { url?: string; title?: string };
-        latestUrl = responseObj.url || latestUrl;
-        latestTitle = responseObj.title || latestTitle;
+        // 验证 URL 有效性，只在 URL 有效时才更新
+        if (responseObj.url && isValidOriginalUrl(responseObj.url)) {
+          latestUrl = responseObj.url;
+        }
+        if (responseObj.title) {
+          latestTitle = responseObj.title;
+        }
         console.log('Got latest page info from content script:', { url: latestUrl, title: latestTitle });
       }
     } catch (error) {
       // content script 可能已失效，使用 tab 对象中的信息
       console.log('Could not get page info from content script, using tab data:', error);
+    }
+
+    // 最终验证：确保 latestUrl 是有效的原始页面 URL
+    if (!isValidOriginalUrl(latestUrl)) {
+      console.warn('Invalid original URL detected, aborting freeze for tab:', tabId, 'url:', latestUrl);
+      freezingInProgress.delete(tabId);
+      return;
     }
 
     let snapshot = await browser.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 50 });
@@ -524,8 +551,15 @@ async function checkAndFreezeTabs() {
     // Check if freeze is in progress
     if (freezingInProgress.has(item.tabId)) return;
 
-    const itemUrl = new URL(item.url).hostname;
-    if (whitelist.includes(itemUrl)) return;
+    // 安全解析 URL，避免非法 URL 导致崩溃
+    let itemUrl = '';
+    try {
+      itemUrl = new URL(item.url).hostname;
+    } catch {
+      // 如果 URL 非法（如 javascript:、chrome:、或 freeze page 自身），跳过白名单检查
+      debugLog('Invalid URL in tabStatusMap, skipping whitelist check:', item.url);
+    }
+    if (itemUrl && whitelist.includes(itemUrl)) return;
 
     // 🔒 关键修复：多重保护机制防止误冻结
     const isCurrentlyActive = activeTabIds.has(item.tabId);

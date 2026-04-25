@@ -93,26 +93,32 @@ function findFreezeTabByUrl(targetUrl: string, freezeTabs: FreezeTabStatus[]): F
 
     const normalizedTarget = normalizeUrl(targetUrl);
 
-    // 1. 精确匹配
-    let match = freezeTabs.find(tab => tab.url === targetUrl);
-    if (match) return match;
+    // 0. 安全检查：跳过非法 URL
+    const isValidUrl = (testUrl: string): boolean => {
+        try {
+            new URL(testUrl);
+            return true;
+        } catch {
+            return false;
+        }
+    };
 
-    // 2. 规范化匹配
-    match = freezeTabs.find(tab => normalizeUrl(tab.url) === normalizedTarget);
-    if (match) return match;
+    // 1. 精确匹配（最可靠）
+    if (isValidUrl(targetUrl)) {
+        let match = freezeTabs.find(tab => tab.url === targetUrl);
+        if (match) return match;
 
-    // 3. URL 包含匹配（处理部分匹配）
-    match = freezeTabs.find(tab =>
-        tab.url.includes(targetUrl) || targetUrl.includes(tab.url)
-    );
-    if (match) return match;
+        // 2. 规范化匹配（处理 hash/params 差异）
+        match = freezeTabs.find(tab => {
+            if (!isValidUrl(tab.url)) return false;
+            return normalizeUrl(tab.url) === normalizedTarget;
+        });
+        if (match) return match;
+    }
 
-    // 4. 规范化包含匹配
-    match = freezeTabs.find(tab => {
-        const normalizedTab = normalizeUrl(tab.url);
-        return normalizedTab.includes(normalizedTarget) || normalizedTarget.includes(normalizedTab);
-    });
-    if (match) return match;
+    // 3. 如果目标 URL 无效但标题有效，尝试标题匹配
+    const titleMatch = freezeTabs.find(tab => tab.title === targetUrl);
+    if (titleMatch) return titleMatch;
 
     return null;
 }
