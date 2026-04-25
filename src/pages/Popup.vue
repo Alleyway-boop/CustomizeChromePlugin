@@ -17,6 +17,42 @@
       </div>
     </div>
 
+    <!-- 搜索框 -->
+    <div class="px-1">
+      <div class="relative">
+        <div class="i-carbon-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></div>
+        <input v-model="searchQuery" type="text" placeholder="Search tabs by title or URL..."
+          class="w-full pl-9 pr-4 py-2 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200/50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-300 transition-all" />
+        <button v-if="searchQuery" @click="searchQuery = ''"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <div class="i-carbon-close text-sm"></div>
+        </button>
+      </div>
+    </div>
+
+    <!-- 智能白名单建议 -->
+    <div v-if="whitelistSuggestions.length > 0"
+      class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+      <div class="flex items-start gap-2 mb-2">
+        <div class="i-carbon-idea text-amber-500 text-lg flex-shrink-0 mt-0.5"></div>
+        <div class="flex-1">
+          <p class="text-sm text-amber-800 font-medium mb-2">
+            You've unfrozen tabs from these domains multiple times:
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <div v-for="domain in whitelistSuggestions" :key="domain"
+              class="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-amber-200">
+              <span class="text-xs text-amber-700 font-medium">{{ domain }}</span>
+              <button @click="addToWhitelistSuggestion(domain)"
+                class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Add</button>
+              <button @click="dismissSuggestion(domain)"
+                class="text-xs text-gray-400 hover:text-gray-600">Dismiss</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 标签页列表和设置区域 -->
     <NScrollbar trigger="none" style="max-height: 400px;">
       <NCollapse :accordion="true" class="gap-2">
@@ -53,12 +89,16 @@
           <template #header-extra>
             <div class="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full">
               <div class="i-carbon-fire text-white text-sm animate-pulse"></div>
-              <span class="text-xs font-bold text-white">{{ TabStatusList.length }}</span>
+              <span class="text-xs font-bold text-white">{{ filteredTabStatusList.length }}</span>
             </div>
           </template>
 
           <div class="flex flex-col gap-2 p-3">
-            <div v-for="(item, index) in TabStatusList" :key="index" @click="GotoTab(item.tabId)"
+            <div v-if="searchQuery && filteredTabStatusList.length === 0"
+              class="text-center py-4 text-gray-500 text-sm">
+              No tabs match "{{ searchQuery }}"
+            </div>
+            <div v-for="(item, index) in filteredTabStatusList" :key="index" @click="GotoTab(item.tabId)"
               class="group relative overflow-hidden rounded-xl border backdrop-blur-sm transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg"
               :class="{
                 'border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50 hover:border-sky-300 hover:shadow-sky-100/50': item.remainingMinutes === -1,
@@ -262,7 +302,7 @@
 
 <script lang="ts" setup>
 import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NScrollbar } from 'naive-ui';
-import { onMounted, onUnmounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref, computed } from 'vue';
 import browser from 'webextension-polyfill';
 import type { TabStatus, FreezeTabStatus, Message, Response, SendResponse } from '../utils';
 import type { ExtendedTabStatus, RestoreAllResult } from '../types';
@@ -276,10 +316,24 @@ const FreezePinned = ref<boolean>();
 const FreezeTimeout = ref<number>();
 const TabStatusList = ref<ExtendedTabStatus[]>([]);
 const freezeTabStatusList = ref<FreezeTabStatus[]>([]);
+const searchQuery = ref('');
+const whitelistSuggestions = ref<string[]>([]);
 let updateTimer: number | null = null;
 let lastTabStatusHash: string = ''; // 用于检测状态变化
 let updateInterval = 3000; // 默认更新间隔
 let noChangeCount = 0; // 连续无变化次数计数器
+
+// Filtered tab list based on search query
+const filteredTabStatusList = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return TabStatusList.value;
+  }
+  const query = searchQuery.value.toLowerCase();
+  return TabStatusList.value.filter(tab =>
+    tab.title?.toLowerCase().includes(query) ||
+    tab.url?.toLowerCase().includes(query)
+  );
+});
 
 // 格式化剩余时间显示
 function formatRemainingTime(minutes: number): string {
@@ -516,12 +570,47 @@ const restoreAllFrozenTabs = async () => {
   }
 };
 
+// Get whitelist suggestions for smart whitelist feature
+function getWhitelistSuggestions() {
+  browser.runtime.sendMessage({ GetWhitelistSuggestions: true }).then((response: Response) => {
+    if (response && response.response && Array.isArray(response.response)) {
+      whitelistSuggestions.value = response.response;
+    }
+  }).catch((error) => {
+    console.error('Error getting whitelist suggestions:', error);
+  });
+}
+
+// Add domain to whitelist from suggestion
+function addToWhitelistSuggestion(domain: string) {
+  browser.runtime.sendMessage({ AddToWhitelist: domain }).then((response: Response) => {
+    if (response && (response as any).success) {
+      // Remove from suggestions
+      whitelistSuggestions.value = whitelistSuggestions.value.filter(d => d !== domain);
+      // Refresh the tab list
+      GetAllTabStatusList();
+    }
+  }).catch((error) => {
+    console.error('Error adding to whitelist:', error);
+  });
+}
+
+// Dismiss a whitelist suggestion
+function dismissSuggestion(domain: string) {
+  browser.runtime.sendMessage({ DismissWhitelistSuggestion: domain }).then((response: Response) => {
+    whitelistSuggestions.value = whitelistSuggestions.value.filter(d => d !== domain);
+  }).catch((error) => {
+    console.error('Error dismissing suggestion:', error);
+  });
+}
+
 
 onMounted(async () => {
   getFreezeTimeout();
   getFreezePinned();
   GetFreezeTabList();
   GetAllTabStatusList();
+  getWhitelistSuggestions(); // Get smart whitelist suggestions
 
   // 启动实时更新
   startRealTimeUpdates();

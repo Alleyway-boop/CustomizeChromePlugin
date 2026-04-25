@@ -43,6 +43,8 @@ interface Emits {
   'add': [domain: string]
   'remove': [domain: string]
   'add-current': []
+  'import': [domains: string[]]
+  'export': [domains: string[]]
 }
 
 const emit = defineEmits<Emits>()
@@ -227,6 +229,80 @@ const formatDomainDisplay = (domain: string): string => {
   }
   return domain
 }
+
+// 导出白名单为 JSON 文件
+const exportWhitelist = () => {
+  const exportData = {
+    version: 1,
+    timestamp: new Date().toISOString(),
+    domains: localWhitelist.value
+  }
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `whitelist-backup-${new Date().toISOString().split('T')[0]}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  emit('export', localWhitelist.value)
+}
+
+// 导入白名单
+const importWhitelist = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = async (e) => {
+    try {
+      const content = e.target?.result as string
+      const data = JSON.parse(content)
+      
+      let domains: string[] = []
+      if (Array.isArray(data)) {
+        // 简单数组格式
+        domains = data
+      } else if (data.domains && Array.isArray(data.domains)) {
+        // 带版本的导出格式
+        domains = data.domains
+      }
+      
+      // 验证和清理域名
+      const validDomains: string[] = []
+      for (const domain of domains) {
+        if (typeof domain === 'string' && domain.trim()) {
+          const cleaned = cleanDomainFormat(domain.trim())
+          const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+          if (domainRegex.test(cleaned) && !validDomains.includes(cleaned)) {
+            validDomains.push(cleaned)
+          }
+        }
+      }
+      
+      // 合并到现有白名单（去重）
+      const mergedDomains = [...new Set([...localWhitelist.value, ...validDomains])]
+      
+      // 更新配置
+      for (const domain of validDomains) {
+        if (!localWhitelist.value.includes(domain)) {
+          await configManager.addToWhitelist(domain)
+          localWhitelist.value.push(domain)
+        }
+      }
+      
+      emit('import', validDomains)
+    } catch (error) {
+      console.error('Failed to import whitelist:', error)
+      alert('Failed to import whitelist. Please check the file format.')
+    }
+  }
+  reader.readAsText(file)
+  // 重置 input 以允许再次选择相同文件
+  target.value = ''
+}
 </script>
 
 <template>
@@ -282,6 +358,46 @@ const formatDomainDisplay = (domain: string): string => {
             </template>
             手动添加
           </n-button>
+
+          <!-- 导出白名单按钮 -->
+          <n-tooltip>
+            <template #trigger>
+              <n-button size="tiny" :disabled="!hasWhitelistItems"
+                class="bg-gradient-to-r from-green-400 to-emerald-500 text-white border-none hover:from-green-500 hover:to-emerald-600 transition-all duration-300"
+                @click="exportWhitelist">
+                <template #icon>
+                  <n-icon size="12">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+                    </svg>
+                  </n-icon>
+                </template>
+                导出
+              </n-button>
+            </template>
+            {{ hasWhitelistItems ? `导出 ${localWhitelist.length} 个域名` : '暂无域名可导出' }}
+          </n-tooltip>
+
+          <!-- 导入白名单按钮 -->
+          <n-tooltip>
+            <template #trigger>
+              <label>
+                <n-button size="tiny" tag="span"
+                  class="bg-gradient-to-r from-purple-400 to-indigo-500 text-white border-none hover:from-purple-500 hover:to-indigo-600 transition-all duration-300 cursor-pointer">
+                  <template #icon>
+                    <n-icon size="12">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                      </svg>
+                    </n-icon>
+                  </template>
+                  导入
+                </n-button>
+                <input type="file" accept=".json" class="hidden" @change="importWhitelist" />
+              </label>
+            </template>
+            导入 JSON 格式的白名单文件
+          </n-tooltip>
         </div>
       </div>
 
