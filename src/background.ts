@@ -1,43 +1,74 @@
 import { ref } from 'vue';
 import browser from 'webextension-polyfill';
-import { Message, SendResponse } from './utils';
+import { Message, SendResponse, TabStatus, FreezeTabStatus } from './types';
 import { safeAsync, safeStorage, safeTabs, ExtensionError, ErrorCodes, isValidDomain, normalizeDomain } from './utils/error-handler';
 import { SmartScheduler } from './utils/performance';
 import { configManager } from './utils/config';
 import { isDomainMatch, domainsToWhitelistItems } from './utils/whitelist-utils';
 import type { WhitelistItem } from './types/whitelist';
+import {
+  DEFAULT_FREEZE_TIMEOUT_MINUTES,
+  BADGE_ZERO_TEXT,
+  BADGE_COLOR,
+  BADGE_TEXT_COLOR,
+  STORAGE_KEY_DEBUG_ENABLED,
+  STORAGE_KEY_FREEZE_TIMEOUT,
+  STORAGE_KEY_FREEZE_PINNED,
+  STORAGE_KEY_WHITELIST,
+  STORAGE_KEY_FREEZE_TAB_LIST,
+  STORAGE_KEY_UNFREEZE_COUNTS,
+  UNFREEZE_COUNT_THRESHOLD,
+} from './constants';
 
 // 常量定义 - 避免魔法数字
 const CHECK_INTERVAL_MS = 60 * 1000; // 每分钟检查一次冻结
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 每小时清理一次冻结标签页
 const TAB_UPDATE_DEBOUNCE_MS = 500; // 标签页更新去重时间
 
+// Debug mode state
+let DEBUG_MODE = false;
+function debugLog(...args: unknown[]) {
+  if (DEBUG_MODE) {
+    console.log('[DEBUG]', ...args);
+  }
+}
+
 // 配置和状态
 let whitelist: string[] = [];
 let FreezeTimeout: number = 20; // 默认值，单位：分钟
 const FreezePinned = ref(false);
 
-interface TabStatus {
-  tabId: number;
-  url: string;
-  icon: string;
-  title: string;
-  lastUseTime: number;
-  windowId?: number;
-  active?: boolean;
-  isVisible?: boolean; // 页面是否真正可见（基于Page Visibility API）
-  visibilityState?: 'visible' | 'hidden' | 'prerender' | 'unloaded';
-}
+// Performance optimization: Use Map for O(1) lookups instead of O(n) array.find()
+let tabStatusMap: Map<number, TabStatus> = new Map();
+let freezeTabStatusMap: Map<number, FreezeTabStatus> = new Map();
 
-interface FreezeTabStatus {
-  tabId: number;
-  url: string;
-  icon: string;
-  title: string;
-}
-
+// For backwards compatibility, expose arrays for UI that expects them
 let tabStatusList: TabStatus[] = [];
 let freezeTabStatusList: FreezeTabStatus[] = [];
+
+// Debounce freeze operations to prevent double-freeze
+const freezingInProgress: Set<number> = new Set();
+
+// Unfreeze count tracking for smart whitelist suggestions
+let unfreezeCountMap: Map<string, number> = new Map();
+
+// Badge update function - shows frozen tab count on extension icon
+async function updateBadge() {
+  const count = freezeTabStatusMap.size;
+  try {
+    if (browser.action && browser.action.setBadgeText) {
+      if (count === 0) {
+        await browser.action.setBadgeText({ text: BADGE_ZERO_TEXT });
+      } else {
+        await browser.action.setBadgeText({ text: String(count) });
+      }
+      await browser.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
+      debugLog('Badge updated:', count === 0 ? BADGE_ZERO_TEXT : count);
+    }
+  } catch (error) {
+    console.warn('Failed to update badge:', error);
+  }
+}
 
 /**
  * Validates and cleans whitelist data from storage
@@ -77,9 +108,10 @@ async function validateAndCleanWhitelist(inputWhitelist: unknown): Promise<strin
 }
 
 // 初始化
-browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist', 'autoRecovery']).then(async (res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[]; autoRecovery?: boolean }) => {
+browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist', 'autoRecovery', STORAGE_KEY_DEBUG_ENABLED]).then(async (res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[]; autoRecovery?: boolean; debugEnabled?: boolean }) => {
   if (res.FreezeTimeout) FreezeTimeout = res.FreezeTimeout;
   if (res.FreezePinned !== undefined) FreezePinned.value = res.FreezePinned;
+  if (res.debugEnabled !== undefined) DEBUG_MODE = res.debugEnabled;
 
   // 验证和清理白名单数据
   if (res.whitelist) {
@@ -89,7 +121,7 @@ browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist', 'autoRec
     // 如果清理过程中移除了无效数据，仅记录日志，不在这里保存
     // 避免循环：存储监听器会处理后续的保存操作
     if (cleanedWhitelist.length !== res.whitelist.length) {
-      console.log('Cleaned whitelist data during initialization:', {
+      debugLog('Cleaned whitelist data during initialization:', {
         original: res.whitelist.length,
         cleaned: cleanedWhitelist.length,
         removed: res.whitelist.length - cleanedWhitelist.length
@@ -100,13 +132,30 @@ browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist', 'autoRec
     whitelist = [];
   }
 
-  console.log('Initial config:', { FreezeTimeout, FreezePinned, whitelist });
+  debugLog('Initial config:', { FreezeTimeout, FreezePinned, whitelist, debugEnabled: DEBUG_MODE });
 
   // autoRecovery: 扩展加载时自动恢复所有冻结的标签页
   if (res.autoRecovery === true) {
     console.log('Auto-recovery enabled, restoring frozen tabs...');
     const result = await restoreAllFrozenTabs();
     console.log('Auto-recovery result:', result);
+  }
+
+  // Update badge on startup
+  await updateBadge();
+});
+
+// Load unfreeze counts from storage for smart whitelist suggestions
+browser.storage.sync.get(STORAGE_KEY_UNFREEZE_COUNTS).then((res: Record<string, unknown>) => {
+  const unfreezeData = res[STORAGE_KEY_UNFREEZE_COUNTS];
+  if (unfreezeData && typeof unfreezeData === 'string') {
+    try {
+      const counts = JSON.parse(unfreezeData);
+      unfreezeCountMap = new Map(Object.entries(counts));
+      debugLog('Loaded unfreeze counts:', unfreezeCountMap);
+    } catch (e) {
+      debugLog('Failed to parse unfreeze counts:', e);
+    }
   }
 });
 
@@ -136,7 +185,10 @@ browser.storage.onChanged.addListener(async (changes, area) => {
 // 在加载存储的冻结标签页之后添加日志
 browser.storage.sync.get('freezeTabStatusList').then((res) => {
   if (res.freezeTabStatusList) {
-    freezeTabStatusList = res.freezeTabStatusList as FreezeTabStatus[];
+    const loadedList = res.freezeTabStatusList as FreezeTabStatus[];
+    freezeTabStatusList = loadedList;
+    // Initialize Map for O(1) lookups
+    freezeTabStatusMap = new Map(loadedList.map(tab => [tab.tabId, tab]));
     console.log('Loaded freezeTabStatusList:', freezeTabStatusList);
   }
 });
@@ -152,8 +204,8 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 
   if (changeInfo.url || changeInfo.title) {
-    // 如果URL或标题发生变化，更新tabStatusList中的信息
-    const tabStatus = tabStatusList.find(item => item.tabId === tabId);
+    // 如果URL或标题发生变化，更新tabStatusMap中的信息
+    const tabStatus = tabStatusMap.get(tabId);
     if (tabStatus) {
       if (changeInfo.url) {
         console.log('Tab URL changed:', { tabId, oldUrl: tabStatus.url, newUrl: changeInfo.url });
@@ -165,6 +217,13 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       }
       if (changeInfo.favIconUrl) {
         tabStatus.icon = changeInfo.favIconUrl;
+      }
+      // Update the Map entry
+      tabStatusMap.set(tabId, tabStatus);
+      // Sync to array for backwards compatibility
+      const index = tabStatusList.findIndex(t => t.tabId === tabId);
+      if (index !== -1) {
+        tabStatusList[index] = tabStatus;
       }
     }
 
@@ -191,8 +250,8 @@ function addTabToList(tab: browser.Tabs.Tab) {
   if (tab.pinned && !FreezePinned.value) return;
   if (!tab.url?.startsWith('http')) return;
 
-  const existingTab = tabStatusList.find(item => item.tabId === tab.id);
-  if (existingTab) return;
+  // Use Map for O(1) lookup
+  if (tabStatusMap.has(tab.id)) return;
 
   const newTab: TabStatus = {
     tabId: tab.id,
@@ -205,6 +264,10 @@ function addTabToList(tab: browser.Tabs.Tab) {
     isVisible: tab.active, // 新创建的标签页，active为true时初始为可见
     visibilityState: tab.active ? 'visible' : 'hidden'
   };
+  
+  // Store in Map for O(1) lookups
+  tabStatusMap.set(tab.id, newTab);
+  // Also maintain array for backwards compatibility
   tabStatusList.push(newTab);
   console.log('New tab added:', newTab);
 }
@@ -221,13 +284,21 @@ function addTabToList(tab: browser.Tabs.Tab) {
 function updateTabInList(tab: browser.Tabs.Tab) {
   if (tab.id === undefined) return;
 
-  const existingTab = tabStatusList.find(t => t.tabId === tab.id);
+  // Use Map for O(1) lookup
+  const existingTab = tabStatusMap.get(tab.id);
   if (existingTab) {
     existingTab.url = tab.url || '';
     existingTab.icon = tab.favIconUrl || '';
     existingTab.title = tab.title || '';
     existingTab.windowId = tab.windowId;
     existingTab.active = tab.active;
+    // Update Map
+    tabStatusMap.set(tab.id, existingTab);
+    // Sync to array for backwards compatibility
+    const index = tabStatusList.findIndex(t => t.tabId === tab.id);
+    if (index !== -1) {
+      tabStatusList[index] = existingTab;
+    }
     // 注意：不在这里直接更新可见性状态，让content script通过Page Visibility API来管理
     console.log('Tab updated:', existingTab);
   } else {
@@ -244,12 +315,19 @@ function updateTabInList(tab: browser.Tabs.Tab) {
  * removeTabFromList(123);
  */
 function removeTabFromList(tabId: number) {
+  // Remove from Map (O(1) operation)
+  const wasInMap = tabStatusMap.delete(tabId);
+  
+  // Also remove from array for backwards compatibility
   const index = tabStatusList.findIndex(tab => tab.tabId === tabId);
-  const freezeIndex = freezeTabStatusList.findIndex(tab => tab.tabId === tabId);
   if (index !== -1) {
     tabStatusList.splice(index, 1);
     console.log('Tab removed:', tabId);
   }
+  
+  // Remove from freeze map and array
+  const freezeWasInMap = freezeTabStatusMap.delete(tabId);
+  const freezeIndex = freezeTabStatusList.findIndex(tab => tab.tabId === tabId);
   if (freezeIndex !== -1) {
     freezeTabStatusList.splice(freezeIndex, 1);
     saveFreeTab();
@@ -268,10 +346,18 @@ browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 browser.tabs.onActivated.addListener(async (activeInfo) => {
   const tab = await browser.tabs.get(activeInfo.tabId);
   if (tab.id && tab.url) {
-    const tabStatus = tabStatusList.find(item => item.tabId === tab.id);
+    // Use Map for O(1) lookup
+    const tabStatus = tabStatusMap.get(tab.id);
     if (tabStatus) {
       const oldTime = tabStatus.lastUseTime;
       tabStatus.lastUseTime = Date.now();
+      // Update Map
+      tabStatusMap.set(tab.id, tabStatus);
+      // Sync to array
+      const index = tabStatusList.findIndex(t => t.tabId === tab.id);
+      if (index !== -1) {
+        tabStatusList[index] = tabStatus;
+      }
       console.log(`Reset countdown due to tab activation for tab ${tab.id}:`, {
         url: tab.url,
         title: tab.title,
@@ -294,10 +380,18 @@ browser.windows.onFocusChanged.addListener(async (windowId) => {
     const tabs = await browser.tabs.query({ active: true, windowId });
     if (tabs.length > 0 && tabs[0].id) {
       const tab = tabs[0];
-      const tabStatus = tabStatusList.find(item => item.tabId === tab.id);
+      // Use Map for O(1) lookup
+      const tabStatus = tabStatusMap.get(tab.id!);
       if (tabStatus) {
         const oldTime = tabStatus.lastUseTime;
         tabStatus.lastUseTime = Date.now();
+        // Update Map
+        tabStatusMap.set(tab.id!, tabStatus);
+        // Sync to array
+        const index = tabStatusList.findIndex(t => t.tabId === tab.id);
+        if (index !== -1) {
+          tabStatusList[index] = tabStatus;
+        }
         console.log(`Reset countdown due to window focus for tab ${tab.id}:`, {
           url: tab.url,
           title: tab.title,
@@ -330,24 +424,66 @@ browser.tabs.query({}).then(tabs => {
  * await FreezeTab(123);
  */
 async function FreezeTab(tabId: number) {
+  // Debounce: Check if already freezing or frozen
+  if (freezingInProgress.has(tabId)) {
+    console.log(`Tab ${tabId} is already being frozen, skipping`);
+    return;
+  }
+  
+  // Check if already frozen using Map (O(1))
+  if (freezeTabStatusMap.has(tabId)) {
+    console.log(`Tab ${tabId} is already frozen, skipping`);
+    return;
+  }
+
   try {
+    freezingInProgress.add(tabId);
+    
     const tab = await browser.tabs.get(tabId);
 
     // 尝试从 content script 获取最新的页面信息
     let latestUrl = tab.url || '';
     let latestTitle = tab.title || '';
 
+    // 检查 URL 是否为有效的原始页面（非 freeze page / chrome:// / javascript: 等）
+    const isValidOriginalUrl = (url: string): boolean => {
+      if (!url) return false;
+      try {
+        const u = new URL(url);
+        // 排除 freeze page、chrome 内部页面、扩展页面
+        if (u.protocol === 'javascript:' || u.protocol === 'chrome:' || u.protocol === 'file:') return false;
+        // 排除已经是 freeze page 的 URL
+        if (u.pathname.includes('options.html') && u.search.includes('url=')) return false;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     try {
-      const pageInfo = await browser.tabs.sendMessage(tabId, { type: 'getPageInfo' }) as any;
+      const pageInfoResponse = await browser.tabs.sendMessage(tabId, { type: 'getPageInfo' });
+      const pageInfo = pageInfoResponse as { response?: { url?: string; title?: string } };
       if (pageInfo && pageInfo.response && typeof pageInfo.response === 'object') {
         const responseObj = pageInfo.response as { url?: string; title?: string };
-        latestUrl = responseObj.url || latestUrl;
-        latestTitle = responseObj.title || latestTitle;
+        // 验证 URL 有效性，只在 URL 有效时才更新
+        if (responseObj.url && isValidOriginalUrl(responseObj.url)) {
+          latestUrl = responseObj.url;
+        }
+        if (responseObj.title) {
+          latestTitle = responseObj.title;
+        }
         console.log('Got latest page info from content script:', { url: latestUrl, title: latestTitle });
       }
     } catch (error) {
       // content script 可能已失效，使用 tab 对象中的信息
       console.log('Could not get page info from content script, using tab data:', error);
+    }
+
+    // 最终验证：确保 latestUrl 是有效的原始页面 URL
+    if (!isValidOriginalUrl(latestUrl)) {
+      console.warn('Invalid original URL detected, aborting freeze for tab:', tabId, 'url:', latestUrl);
+      freezingInProgress.delete(tabId);
+      return;
     }
 
     let snapshot = await browser.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 50 });
@@ -359,12 +495,16 @@ async function FreezeTab(tabId: number) {
     await browser.tabs.sendMessage(tabId, { type: 'setSnapshot', snapshot });
 
     removeTabFromList(tabId);
-    freezeTabStatusList.push({
+    
+    // Add to freeze map (O(1))
+    const frozenTab: FreezeTabStatus = {
       tabId: tab.id!,
       url: latestUrl,
       icon: tab.favIconUrl || '',
       title: latestTitle,
-    });
+    };
+    freezeTabStatusMap.set(tabId, frozenTab);
+    freezeTabStatusList.push(frozenTab);
 
     console.log('Tab frozen with latest info:', {
       tabId: tab.id,
@@ -373,8 +513,11 @@ async function FreezeTab(tabId: number) {
     });
 
     saveFreeTab();
+    updateBadge(); // Update badge after freezing
   } catch (error) {
     console.error('Error freezing tab:', error);
+  } finally {
+    freezingInProgress.delete(tabId);
   }
 }
 
@@ -390,7 +533,7 @@ async function FreezeTab(tabId: number) {
  */
 async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: string; restoredCount: number }> {
   try {
-    if (freezeTabStatusList.length === 0) {
+    if (freezeTabStatusMap.size === 0) {
       return { success: true, message: 'No frozen tabs to restore', restoredCount: 0 };
     }
 
@@ -400,11 +543,15 @@ async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: stri
     const currentTabs = await browser.tabs.query({});
     const currentTabIds = new Set(currentTabs.map(tab => tab.id));
 
+    // Get tabs to restore from Map
+    const tabsToRestore = Array.from(freezeTabStatusMap.values());
+    
     // 遍历所有冻结的标签页并恢复
-    for (const frozenTab of [...freezeTabStatusList]) {
+    for (const frozenTab of tabsToRestore) {
       try {
         // 检查标签页是否仍然存在
         if (!currentTabIds.has(frozenTab.tabId)) {
+          freezeTabStatusMap.delete(frozenTab.tabId);
           freezeTabStatusList = freezeTabStatusList.filter(tab => tab.tabId !== frozenTab.tabId);
           continue;
         }
@@ -421,18 +568,37 @@ async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: stri
           addTabToList(restoredTab);
         }
 
-        // 从冻结列表中移除
+        // 从冻结Map和数组中移除
+        freezeTabStatusMap.delete(frozenTab.tabId);
         freezeTabStatusList = freezeTabStatusList.filter(tab => tab.tabId !== frozenTab.tabId);
         restoredCount++;
 
       } catch (error) {
         // 如果恢复失败，从冻结列表中移除以避免重复尝试
+        freezeTabStatusMap.delete(frozenTab.tabId);
         freezeTabStatusList = freezeTabStatusList.filter(tab => tab.tabId !== frozenTab.tabId);
       }
     }
 
     // 保存更新后的冻结列表
     await saveFreeTab();
+    await updateBadge(); // Update badge after restoring
+
+    // Track unfreeze counts for smart whitelist suggestions
+    for (const frozenTab of tabsToRestore) {
+      try {
+        const url = new URL(frozenTab.url);
+        const domain = url.hostname;
+        const currentCount = unfreezeCountMap.get(domain) || 0;
+        unfreezeCountMap.set(domain, currentCount + 1);
+      } catch (e) {
+        // Invalid URL, skip
+      }
+    }
+    // Persist unfreeze counts
+    const countsObj = Object.fromEntries(unfreezeCountMap);
+    await safeStorage.set({ [STORAGE_KEY_UNFREEZE_COUNTS]: JSON.stringify(countsObj) });
+    debugLog('Updated unfreeze counts:', unfreezeCountMap);
 
     const message = restoredCount > 0
       ? `Successfully restored ${restoredCount} frozen tabs`
@@ -474,26 +640,33 @@ async function checkAndFreezeTabs() {
   const activeTabIds = new Set(activeTabs.map(tab => tab.id).filter(id => id !== undefined));
 
   // 获取所有可见的标签页（通过 Page Visibility API）
-  const visibleTabIds = tabStatusList
-    .filter(tab => tab.isVisible === true && tab.visibilityState === 'visible')
-    .map(tab => tab.tabId);
+  // Use Map for iteration
+  const visibleTabIds: number[] = [];
+  tabStatusMap.forEach(tab => {
+    if (tab.isVisible === true && tab.visibilityState === 'visible') {
+      visibleTabIds.push(tab.tabId);
+    }
+  });
 
   // BUG-001修复：先收集待冻结的tabId，避免在遍历时修改数组
   const tabsToFreeze: number[] = [];
 
-  for (const item of tabStatusList) {
-    if (isTabFrozen(item.tabId)) continue;
+  tabStatusMap.forEach((item) => {
+    // Check if already frozen (O(1) with Map)
+    if (freezeTabStatusMap.has(item.tabId)) return;
+    // Check if freeze is in progress
+    if (freezingInProgress.has(item.tabId)) return;
 
-    let itemHostname: string;
+    // 安全解析 URL，避免非法 URL 导致崩溃
+    let itemHostname = '';
     try {
       itemHostname = new URL(item.url).hostname;
-    } catch (error) {
-      console.warn('Invalid URL in tab status, skipping:', item.url, error);
-      continue;
+    } catch {
+      debugLog('Invalid URL in tabStatusMap, skipping:', item.url);
     }
 
     // BUG-009修复：使用通配符匹配的whitelist检查
-    if (isDomainInWhitelist(itemHostname)) continue;
+    if (itemHostname && isDomainInWhitelist(itemHostname)) return;
 
     // 🔒 关键修复：多重保护机制防止误冻结
     const isCurrentlyActive = activeTabIds.has(item.tabId);
@@ -506,7 +679,7 @@ async function checkAndFreezeTabs() {
         visible: isCurrentlyVisible,
         url: item.url
       });
-      continue;
+      return;
     }
 
     // 只有在非活动且不可见的情况下才检查超时
@@ -521,7 +694,7 @@ async function checkAndFreezeTabs() {
       });
       tabsToFreeze.push(item.tabId);
     }
-  }
+  });
 
   // 统一处理冻结，避免在遍历时修改数组
   for (const tabId of tabsToFreeze) {
@@ -565,7 +738,8 @@ async function getCurrentActiveTabId(): Promise<number | null> {
  * }
  */
 async function calculateRemainingTime(tabId: number): Promise<number> {
-  const tab = tabStatusList.find(item => item.tabId === tabId);
+  // Use Map for O(1) lookup
+  const tab = tabStatusMap.get(tabId);
   if (!tab) return 0;
 
   // 基于页面可见性判断是否为活动状态
@@ -600,7 +774,8 @@ async function calculateRemainingTime(tabId: number): Promise<number> {
  * });
  */
 async function getAllTabsRemainingTime() {
-  const tabPromises = tabStatusList.map(async tab => ({
+  // Use Map values for iteration
+  const tabPromises = Array.from(tabStatusMap.values()).map(async tab => ({
     tabId: tab.tabId,
     title: tab.title,
     url: tab.url,
@@ -626,7 +801,8 @@ async function getAllTabsRemainingTime() {
  * }
  */
 function isTabFrozen(tabId: number): boolean {
-  return freezeTabStatusList.some(tab => tab.tabId === tabId);
+  // Use Map for O(1) lookup
+  return freezeTabStatusMap.has(tabId);
 }
 
 /** saveFreeTab 防抖定时器 */
@@ -656,6 +832,50 @@ async function doSaveFreeTab() {
     console.error('Error saving freeze tab status:', error);
   }
 }
+
+// MV3 Service Worker Compliance: Replace setInterval with chrome.alarms API
+// Service workers in MV3 can be suspended/terminated at any time, making setInterval unreliable
+const FREEZE_CHECK_ALARM_NAME = 'freezeCheckAlarm';
+const FREEZE_CHECK_PERIOD_MINUTES = 1;
+
+function setupFreezeCheckAlarm() {
+  browser.alarms.create(FREEZE_CHECK_ALARM_NAME, {
+    delayInMinutes: FREEZE_CHECK_PERIOD_MINUTES,
+    periodInMinutes: FREEZE_CHECK_PERIOD_MINUTES
+  });
+}
+
+// Listen for the alarm to trigger freeze check
+browser.alarms.onAlarm.addListener((alarm: { name: string }) => {
+  if (alarm.name === FREEZE_CHECK_ALARM_NAME) {
+    console.log('Freeze check alarm triggered');
+    checkAndFreezeTabs().catch(error => {
+      console.error('Error in checkAndFreezeTabs:', error);
+    });
+  }
+});
+
+// Also set up the cleanup alarm
+const CLEANUP_ALARM_NAME = 'cleanupAlarm';
+const CLEANUP_PERIOD_MINUTES = 60;
+
+function setupCleanupAlarm() {
+  browser.alarms.create(CLEANUP_ALARM_NAME, {
+    delayInMinutes: CLEANUP_PERIOD_MINUTES,
+    periodInMinutes: CLEANUP_PERIOD_MINUTES
+  });
+}
+
+browser.alarms.onAlarm.addListener((alarm: { name: string }) => {
+  if (alarm.name === CLEANUP_ALARM_NAME) {
+    console.log('Cleanup alarm triggered');
+    cleanupFrozenTabs();
+  }
+});
+
+// Initialize alarms when extension starts
+setupFreezeCheckAlarm();
+setupCleanupAlarm();
 
 /**
  * Saves the current freeze tab status list to storage
@@ -1114,10 +1334,18 @@ async function importWhitelistData(
 browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendResponse) => {
   const request = req as Message;
   if (request.UpDateLastUseTime && sender.tab?.id) {
-    const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
+    // Use Map for O(1) lookup
+    const tabStatus = tabStatusMap.get(sender.tab!.id);
     console.log('Update last use time:', tabStatus);
     if (tabStatus) {
       tabStatus.lastUseTime = Date.now();
+      // Update Map
+      tabStatusMap.set(sender.tab!.id, tabStatus);
+      // Sync to array
+      const index = tabStatusList.findIndex(t => t.tabId === sender.tab!.id);
+      if (index !== -1) {
+        tabStatusList[index] = tabStatus;
+      }
       sendResponse({ response: 'Last use time updated' });
     } else {
       addTabToList(sender.tab);
@@ -1127,7 +1355,8 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
 
   // 处理页面信息更新
   if (request.UpdatePageInfo && sender.tab?.id) {
-    const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
+    // Use Map for O(1) lookup
+    const tabStatus = tabStatusMap.get(sender.tab!.id);
     if (tabStatus) {
       const urlChanged = request.url && request.url !== tabStatus.url;
       const titleChanged = request.title && request.title !== tabStatus.title;
@@ -1152,6 +1381,14 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
           oldTime: new Date(oldTime).toLocaleTimeString(),
           newTime: new Date(tabStatus.lastUseTime).toLocaleTimeString()
         });
+      }
+
+      // Update Map
+      tabStatusMap.set(sender.tab!.id, tabStatus);
+      // Sync to array
+      const index = tabStatusList.findIndex(t => t.tabId === sender.tab!.id);
+      if (index !== -1) {
+        tabStatusList[index] = tabStatus;
       }
 
       sendResponse({ response: 'Page info updated and countdown reset' });
@@ -1188,8 +1425,28 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     sendResponse({ response: freezeTabStatusList });
   }
   if (request.RemoveFreezeTab) {
+    // Find the tab being removed to track the domain
+    const removedTab = freezeTabStatusList.find((tab) => tab.tabId === request.RemoveFreezeTab);
     freezeTabStatusList = freezeTabStatusList.filter((tab) => tab.tabId !== request.RemoveFreezeTab);
+    freezeTabStatusMap.delete(request.RemoveFreezeTab as number);
     saveFreeTab();
+    updateBadge(); // Update badge after removing frozen tab
+    
+    // Track unfreeze for smart whitelist suggestion
+    if (removedTab) {
+      try {
+        const url = new URL(removedTab.url);
+        const domain = url.hostname;
+        const currentCount = unfreezeCountMap.get(domain) || 0;
+        unfreezeCountMap.set(domain, currentCount + 1);
+        const countsObj = Object.fromEntries(unfreezeCountMap);
+        safeStorage.set({ [STORAGE_KEY_UNFREEZE_COUNTS]: JSON.stringify(countsObj) });
+        debugLog('Updated unfreeze count for', domain, ':', currentCount + 1);
+      } catch (e) {
+        // Invalid URL, skip
+      }
+    }
+    
     sendResponse({ response: 'Tab removed from freeze list' });
   }
 
@@ -1216,20 +1473,61 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
 
   if (request.AddToWhitelist) {
     addToWhitelist(request.AddToWhitelist).then(result => {
-      sendResponse({ response: result });
+      sendResponse({ response: result as { success: true; message: string } });
     }).catch(error => {
       console.error('Error adding to whitelist:', error);
-      sendResponse({ response: { success: false, message: 'Failed to add domain to whitelist' } });
+      sendResponse({ response: { success: false, message: 'Failed to add domain to whitelist' } as { success: false; message: string } });
     });
     return true; // 异步响应
   }
 
+  // Set debug mode
+  if (request.SetDebugMode !== undefined) {
+    DEBUG_MODE = request.SetDebugMode;
+    safeStorage.set({ [STORAGE_KEY_DEBUG_ENABLED]: DEBUG_MODE }).then(() => {
+      debugLog('Debug mode set to:', DEBUG_MODE);
+      sendResponse({ response: { success: true, debugEnabled: DEBUG_MODE } });
+    });
+    return true;
+  }
+
+  // Get debug mode status
+  if (request.GetDebugMode) {
+    sendResponse({ response: DEBUG_MODE });
+    return true;
+  }
+
+  // Get smart whitelist suggestions (domains unfrozen 3+ times)
+  if (request.GetWhitelistSuggestions) {
+    const suggestions: string[] = [];
+    unfreezeCountMap.forEach((count, domain) => {
+      if (count >= UNFREEZE_COUNT_THRESHOLD && !whitelist.includes(domain)) {
+        suggestions.push(domain);
+      }
+    });
+    debugLog('Whitelist suggestions:', suggestions);
+    sendResponse({ response: suggestions });
+    return true;
+  }
+
+  // Dismiss whitelist suggestion for a domain
+  if (request.DismissWhitelistSuggestion) {
+    const domain = request.DismissWhitelistSuggestion;
+    unfreezeCountMap.delete(domain);
+    const countsObj = Object.fromEntries(unfreezeCountMap);
+    safeStorage.set({ [STORAGE_KEY_UNFREEZE_COUNTS]: JSON.stringify(countsObj) }).then(() => {
+      debugLog('Dismissed whitelist suggestion for:', domain);
+      sendResponse({ response: { success: true } });
+    });
+    return true;
+  }
+
   if (request.RemoveFromWhitelist) {
     removeFromWhitelist(request.RemoveFromWhitelist).then(result => {
-      sendResponse({ response: result });
+      sendResponse({ response: result as { success: true; message: string } });
     }).catch(error => {
       console.error('Error removing from whitelist:', error);
-      sendResponse({ response: { success: false, message: 'Failed to remove domain from whitelist' } });
+      sendResponse({ response: { success: false, message: 'Failed to remove domain from whitelist' } as { success: false; message: string } });
     });
     return true; // 异步响应
   }
@@ -1291,27 +1589,49 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
 
   // 处理页面可见性变化
   if (request.SetPageVisible) {
-    const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
+    // Use Map for O(1) lookup
+    const tabStatus = tabStatusMap.get(sender.tab!.id!);
     if (tabStatus) {
       tabStatus.isVisible = true;
       tabStatus.visibilityState = 'visible';
       tabStatus.lastUseTime = Date.now(); // 页面可见时更新使用时间
+      // Update Map
+      tabStatusMap.set(sender.tab!.id!, tabStatus);
+      // Sync to array
+      const index = tabStatusList.findIndex(t => t.tabId === sender.tab!.id);
+      if (index !== -1) {
+        tabStatusList[index] = tabStatus;
+      }
       console.log('Page became visible:', { tabId: sender.tab!.id, url: tabStatus.url });
     }
   }
 
   if (request.SetPageHidden) {
-    const tabStatus = tabStatusList.find(item => item.tabId === sender.tab!.id);
+    // Use Map for O(1) lookup
+    const tabStatus = tabStatusMap.get(sender.tab!.id!);
     if (tabStatus) {
       tabStatus.isVisible = false;
       tabStatus.visibilityState = 'hidden';
+      // Update Map
+      tabStatusMap.set(sender.tab!.id!, tabStatus);
+      // Sync to array
+      const index = tabStatusList.findIndex(t => t.tabId === sender.tab!.id);
+      if (index !== -1) {
+        tabStatusList[index] = tabStatus;
+      }
       console.log('Page became hidden:', { tabId: sender.tab!.id, url: tabStatus.url });
     }
   }
 
   if (request.GetVisibleTabs) {
-    const visibleTabs = tabStatusList.filter(tab => tab.isVisible === true && tab.visibilityState === 'visible');
-    sendResponse({ response: visibleTabs.map(tab => tab.tabId) });
+    // Use Map for efficient filtering
+    const visibleTabs: number[] = [];
+    tabStatusMap.forEach(tab => {
+      if (tab.isVisible === true && tab.visibilityState === 'visible') {
+        visibleTabs.push(tab.tabId);
+      }
+    });
+    sendResponse({ response: visibleTabs });
     return true;
   }
 
@@ -1380,74 +1700,66 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
 /**
  * Removes closed tabs from the freeze list
  * Compares against currently open tabs and removes stale entries
- *
- * @returns Promise that resolves when cleanup is complete
- *
- * @example
- * await cleanupFrozenTabs();
  */
-async function cleanupFrozenTabs() {
-  const tabs = await browser.tabs.query({});
-  const currentTabIds = tabs.map(tab => tab.id);
-  freezeTabStatusList = freezeTabStatusList.filter(frozenTab =>
-    currentTabIds.includes(frozenTab.tabId)
-  );
-  saveFreeTab();
+function cleanupFrozenTabs() {
+  browser.tabs.query({}).then(tabs => {
+    const currentTabIds = new Set(tabs.map(tab => tab.id));
+
+    // Clean up freezeTabStatusMap - remove tabs that no longer exist
+    freezeTabStatusMap.forEach((_frozenTab, tabId) => {
+      if (!currentTabIds.has(tabId)) {
+        freezeTabStatusMap.delete(tabId);
+      }
+    });
+
+    // Also clean up array for backwards compatibility
+    freezeTabStatusList = freezeTabStatusList.filter(frozenTab =>
+      currentTabIds.has(frozenTab.tabId)
+    );
+
+    saveFreeTab();
+  });
 }
 
 /**
  * Handles keyboard command events from browser.commands API
  * Executes the corresponding action based on the command name
- *
- * @param command - The command identifier (e.g., 'freeze-current-tab')
- *
- * @example
- * // When user presses Ctrl+Shift+F
- * // command will be 'freeze-current-tab'
  */
-browser.commands.onCommand.addListener(async (command: string) => {
-  console.log('Keyboard command triggered:', command);
+browser.commands?.onCommand?.addListener(async (command: string) => {
+  debugLog('Keyboard command received:', command);
 
   try {
     switch (command) {
       case 'freeze-current-tab': {
-        // 冻结当前标签页
         const activeTabId = await getCurrentActiveTabId();
         if (activeTabId !== null) {
           await FreezeTab(activeTabId);
-          console.log('Frozen current tab via keyboard shortcut:', activeTabId);
+          debugLog('Frozen current tab via keyboard shortcut:', activeTabId);
         }
         break;
       }
 
       case 'unfreeze-all-tabs': {
-        // 解冻所有标签页
         const result = await restoreAllFrozenTabs();
-        console.log('Unfroze all tabs via keyboard shortcut:', result);
+        debugLog('Unfroze all tabs via keyboard shortcut:', result);
         break;
       }
 
       case 'add-to-whitelist': {
-        // 添加当前网站到白名单
         const activeTabId = await getCurrentActiveTabId();
         if (activeTabId !== null) {
           const tab = await browser.tabs.get(activeTabId);
           if (tab.url) {
             const hostname = new URL(tab.url).hostname;
             const result = await addToWhitelist(hostname);
-            console.log('Added to whitelist via keyboard shortcut:', {
-              hostname,
-              result
-            });
+            debugLog('Added to whitelist via keyboard shortcut:', { hostname, result });
           }
         }
         break;
       }
 
       case 'open-popup': {
-        // 打开弹出窗口 - 在 Chrome 中无法通过 API 主动打开 popup
-        // 但可以打开选项页面作为替代
-        console.log('Open popup command received - browser popup cannot be opened programmatically');
+        debugLog('Open popup command received - browser popup cannot be opened programmatically');
         break;
       }
 

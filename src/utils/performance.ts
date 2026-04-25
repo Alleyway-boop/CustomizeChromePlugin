@@ -3,6 +3,7 @@
  * Provides debounce, throttle, caching, and scheduling utilities
  */
 
+import browser from 'webextension-polyfill';
 import { safeAsync } from './error-handler';
 
 /**
@@ -25,7 +26,7 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: number | null = null;
+  let timeout: ReturnType<typeof setTimeout> | null = null;
 
   return (...args: Parameters<T>) => {
     if (timeout) {
@@ -82,7 +83,7 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 export class MemoryMonitor {
   private static instance: MemoryMonitor;
   private callbacks: ((usage: any) => void)[] = [];
-  private intervalId?: number;
+  private intervalId?: ReturnType<typeof setInterval>;
 
     /**
      * Gets the singleton MemoryMonitor instance
@@ -279,7 +280,7 @@ export class SmartScheduler {
     lastRun: number;
     enabled: boolean;
   }> = new Map();
-  private intervalId?: number;
+  private intervalId?: ReturnType<typeof setInterval>;
 
   /**
    * Adds a task to the scheduler
@@ -386,7 +387,7 @@ export class SmartScheduler {
  */
 export class CacheManager<T> {
   private cache: Map<string, { data: T; timestamp: number; ttl: number }> = new Map();
-  private cleanupInterval?: number;
+  private cleanupInterval?: ReturnType<typeof setInterval>;
 
   /**
    * Creates a new cache manager

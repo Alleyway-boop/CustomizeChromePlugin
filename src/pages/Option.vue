@@ -10,6 +10,7 @@ import {
     UploadSettledFileInfo,
 } from "naive-ui";
 import browser from "webextension-polyfill";
+import type { FreezeTabStatus } from "../utils";
 
 // 安全的 URL 解码函数
 function decodeURIComponentSafe(encoded: string): string {
@@ -60,12 +61,13 @@ onMounted(() => {
     console.log("Icon:", icon.value);
 
     // 监听来自背景脚本的消息
-    browser.runtime.onMessage.addListener((message: any) => {
-        if (message.type === "setSnapshot") {
-            snapshot.value = message.snapshot;
+    browser.runtime.onMessage.addListener((message: unknown) => {
+        const msg = message as { type?: string; snapshot?: string };
+        if (msg.type === "setSnapshot" && msg.snapshot) {
+            snapshot.value = msg.snapshot;
         }
     });
-    browser.storage.local.get("backgroundImage").then((result: any) => {
+    browser.storage.local.get("backgroundImage").then((result: { backgroundImage?: string }) => {
         if (result.backgroundImage) {
             background.value = result.backgroundImage;
             document.body.style.backgroundImage = `url(${background.value})`;
@@ -86,31 +88,37 @@ function normalizeUrl(inputUrl: string): string {
 }
 
 // 更可靠的匹配函数
-function findFreezeTabByUrl(targetUrl: string, freezeTabs: any[]): any | null {
+function findFreezeTabByUrl(targetUrl: string, freezeTabs: FreezeTabStatus[]): FreezeTabStatus | null {
     if (!freezeTabs || freezeTabs.length === 0) return null;
 
     const normalizedTarget = normalizeUrl(targetUrl);
 
-    // 1. 精确匹配
-    let match = freezeTabs.find(tab => tab.url === targetUrl);
-    if (match) return match;
+    // 0. 安全检查：跳过非法 URL
+    const isValidUrl = (testUrl: string): boolean => {
+        try {
+            new URL(testUrl);
+            return true;
+        } catch {
+            return false;
+        }
+    };
 
-    // 2. 规范化匹配
-    match = freezeTabs.find(tab => normalizeUrl(tab.url) === normalizedTarget);
-    if (match) return match;
+    // 1. 精确匹配（最可靠）
+    if (isValidUrl(targetUrl)) {
+        let match = freezeTabs.find(tab => tab.url === targetUrl);
+        if (match) return match;
 
-    // 3. URL 包含匹配（处理部分匹配）
-    match = freezeTabs.find(tab =>
-        tab.url.includes(targetUrl) || targetUrl.includes(tab.url)
-    );
-    if (match) return match;
+        // 2. 规范化匹配（处理 hash/params 差异）
+        match = freezeTabs.find(tab => {
+            if (!isValidUrl(tab.url)) return false;
+            return normalizeUrl(tab.url) === normalizedTarget;
+        });
+        if (match) return match;
+    }
 
-    // 4. 规范化包含匹配
-    match = freezeTabs.find(tab => {
-        const normalizedTab = normalizeUrl(tab.url);
-        return normalizedTab.includes(normalizedTarget) || normalizedTarget.includes(normalizedTab);
-    });
-    if (match) return match;
+    // 3. 如果目标 URL 无效但标题有效，尝试标题匹配
+    const titleMatch = freezeTabs.find(tab => tab.title === targetUrl);
+    if (titleMatch) return titleMatch;
 
     return null;
 }
@@ -119,7 +127,7 @@ function BackSource() {
     window.location.href = url.value;
 
     // 通知移除freezeTab - 使用更可靠的匹配机制
-    browser.storage.sync.get('freezeTabStatusList').then((result: any) => {
+    browser.storage.sync.get('freezeTabStatusList').then((result: { freezeTabStatusList?: FreezeTabStatus[] }) => {
         if (!result.freezeTabStatusList) {
             console.log('No freezeTabStatusList found');
             return;
@@ -136,7 +144,7 @@ function BackSource() {
         } else {
             console.warn('No matching freeze tab found for URL:', url.value);
             // 如果找不到匹配项，尝试通过标题匹配
-            const titleMatch = result.freezeTabStatusList.find((item: any) =>
+            const titleMatch = result.freezeTabStatusList.find((item: FreezeTabStatus) =>
                 item.title === title.value
             );
             if (titleMatch) {
@@ -177,7 +185,7 @@ function SaveBackgroundImage(file: UploadSettledFileInfo) {
     };
     reader.readAsDataURL(file.file!);
 }
-function onChange({ file, fileList }: { file: any, fileList: any[] }) {
+function onChange({ file, fileList }: { file: UploadFileInfo; fileList: UploadFileInfo[] }) {
     console.log("onChange:", { file, fileList });
 }
 </script>

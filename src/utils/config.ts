@@ -3,6 +3,7 @@
  * Provides centralized configuration management with storage synchronization
  */
 
+import browser from 'webextension-polyfill';
 import { safeStorage, ExtensionError, ErrorCodes } from './error-handler';
 import {
   type WhitelistItem,
@@ -99,7 +100,7 @@ export class ConfigManager {
    */
   async initialize(): Promise<void> {
     try {
-      const stored = await safeStorage.get<any>([
+      const stored = await safeStorage.get([
         'freezeTimeout',
         'freezePinned',
         'whitelist',
@@ -110,7 +111,18 @@ export class ConfigManager {
         'autoRecovery',
         'notifications',
         'debugMode'
-      ]);
+      ]) as {
+        freezeTimeout?: number;
+        freezePinned?: boolean;
+        whitelist?: string[];
+        enabled?: boolean;
+        cleanupInterval?: number;
+        maxTabs?: number;
+        snapshotQuality?: number;
+        autoRecovery?: boolean;
+        notifications?: boolean;
+        debugMode?: boolean;
+      };
 
       this.config = {
         freezeTimeout: stored.freezeTimeout ?? DEFAULT_CONFIG.freezeTimeout,
@@ -538,14 +550,15 @@ export class ConfigManager {
   }
 
   private setupStorageListener(): void {
-    browser.storage.sync.onChanged.addListener((changes, area) => {
+    // @ts-ignore - webextension-polyfill types are incomplete for storage.onChanged callback
+    browser.storage.sync.onChanged.addListener((changes: any, area: any) => {
       if (area === 'sync') {
         let needsUpdate = false;
         const updates: Partial<AppConfig> = {};
 
         Object.entries(changes).forEach(([key, change]: [string, any]) => {
           if (key in this.config) {
-            (updates as any)[key] = change.newValue;
+            (updates as Record<string, unknown>)[key] = change.newValue;
             needsUpdate = true;
           }
         });

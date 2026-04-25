@@ -35,7 +35,8 @@
     "tabs",
     "activeTab",
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "alarms"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -44,7 +45,7 @@
     "page": "src/options.html",
     "open_in_tab": true
   },
-  "commands": {
+  "{{chrome}}.commands": {
     "freeze-current-tab": {
       "suggested_key": {
         "default": "Ctrl+Shift+F",

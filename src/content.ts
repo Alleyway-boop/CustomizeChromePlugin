@@ -31,6 +31,10 @@ let lastVisibilityReport: string = currentVisibilityState;
 /** notifyPageUpdate 防抖定时器 */
 let notifyPageUpdateTimeout: number | null = null;
 
+// Memory leak fix: Store interval ID for cleanup
+let activityCheckInterval: number | null = null;
+const ACTIVITY_CHECK_INTERVAL_MS = 1000 * 30; // 30 seconds
+
 /**
  * Notifies background script of page URL or title changes
  * Only sends update if changes are detected to reduce message traffic
@@ -103,8 +107,12 @@ function notifyVisibilityChange() {
         browser.runtime.sendMessage({ UpDateLastUseTime: true }).catch(() => {
             // 忽略错误
         });
+        // Resume activity check when visible
+        resumeActivityCheck();
     } else {
         message = { SetPageHidden: true };
+        // Pause activity check when hidden to save resources
+        pauseActivityCheck();
     }
 
     browser.runtime.sendMessage(message).catch((error) => {
@@ -119,6 +127,53 @@ function notifyVisibilityChange() {
  * 2. Reporting initial page information
  * 3. Reporting initial visibility state
  */
+
+// Memory leak fix: Activity check with proper cleanup
+function startActivityCheck() {
+    // Clear any existing interval first
+    if (activityCheckInterval !== null) {
+        clearInterval(activityCheckInterval);
+    }
+
+    activityCheckInterval = window.setInterval(() => {
+        // Only send updates if page is visible to save resources
+        if (document.visibilityState === 'visible') {
+            browser.runtime.sendMessage({ getTabActive: true }).then((res) => {
+                const tabActive = res as Response;
+                if (tabActive.response) {
+                    browser.runtime.sendMessage({ UpDateLastUseTime: true });
+                    // 定期检查页面信息变化
+                    notifyPageUpdate();
+                }
+            }).catch(() => {
+                // Ignore errors - page might be closed
+            });
+        }
+    }, ACTIVITY_CHECK_INTERVAL_MS);
+}
+
+function stopActivityCheck() {
+    if (activityCheckInterval !== null) {
+        clearInterval(activityCheckInterval);
+        activityCheckInterval = null;
+        console.log('Activity check interval stopped');
+    }
+}
+
+function pauseActivityCheck() {
+    if (activityCheckInterval !== null) {
+        clearInterval(activityCheckInterval);
+        activityCheckInterval = null;
+        console.log('Activity check paused');
+    }
+}
+
+function resumeActivityCheck() {
+    if (activityCheckInterval === null) {
+        startActivityCheck();
+        console.log('Activity check resumed');
+    }
+}
 browser.runtime.sendMessage({ getTabId: true }).then((tabId) => {
     currentTabId = tabId as number;
 
@@ -127,9 +182,17 @@ browser.runtime.sendMessage({ getTabId: true }).then((tabId) => {
         notifyPageUpdate();
         // 初始报告页面可见性状态
         notifyVisibilityChange();
+        // Start activity check
+        startActivityCheck();
     }, 1000);
 }).catch(() => {
     // 忽略错误
+});
+
+// Memory leak fix: Cleanup on page unload
+window.addEventListener('beforeunload', () => {
+    stopActivityCheck();
+    browser.runtime.sendMessage({ DeleteTab: true });
 });
 
 // 添加 Page Visibility API 监听器
@@ -241,21 +304,8 @@ if (titleTarget) {
     console.warn('Could not find title element or head to observe');
 }
 
-/**
- * Periodic activity check
- * Confirms tab is still active and updates last use time
- * Runs every 30 seconds to maintain tab activity
- */
-setInterval(() => {
-    browser.runtime.sendMessage({ getTabActive: true }).then((res) => {
-        const tabActive = res as Response;
-        if (tabActive.response) {
-            browser.runtime.sendMessage({ UpDateLastUseTime: true });
-            // 定期检查页面信息变化
-            notifyPageUpdate();
-        }
-    });
-}, PERIODIC_CHECK_INTERVAL_MS);
+// Note: The old setInterval has been replaced by startActivityCheck()
+// which is started during initialization and properly cleaned up on page unload.
 
 /**
  * User Activity Monitoring
