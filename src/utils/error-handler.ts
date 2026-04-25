@@ -2,6 +2,8 @@
  * 错误处理工具模块
  */
 
+import * as webext from 'webextension-polyfill';
+
 export class ExtensionError extends Error {
   constructor(
     message: string,
@@ -134,7 +136,7 @@ export function normalizeDomain(domain: string): string {
 export const safeStorage = {
   async get<T>(keys: string[]): Promise<Record<string, T>> {
     try {
-      return await browser.storage.sync.get(keys) as Record<string, T>;
+      return await webext.storage.sync.get(keys) as Record<string, T>;
     } catch (error) {
       throw new ExtensionError(
         'Failed to get storage data',
@@ -146,7 +148,7 @@ export const safeStorage = {
 
   async set(data: Record<string, unknown>): Promise<void> {
     try {
-      await browser.storage.sync.set(data);
+      await webext.storage.sync.set(data);
     } catch (error) {
       throw new ExtensionError(
         'Failed to set storage data',
@@ -158,7 +160,7 @@ export const safeStorage = {
 
   async remove(keys: string[]): Promise<void> {
     try {
-      await browser.storage.sync.remove(keys);
+      await webext.storage.sync.remove(keys);
     } catch (error) {
       throw new ExtensionError(
         'Failed to remove storage data',
@@ -173,7 +175,7 @@ export const safeStorage = {
  * 安全的标签页操作
  */
 export const safeTabs = {
-  async get(tabId: number): Promise<browser.tabs.Tab> {
+  async get(tabId: number): Promise<webext.Tabs.Tab> {
     if (!isValidTabId(tabId)) {
       throw new ExtensionError(
         `Invalid tab ID: ${tabId}`,
@@ -182,7 +184,7 @@ export const safeTabs = {
     }
 
     try {
-      const tab = await browser.tabs.get(tabId);
+      const tab = await webext.tabs.get(tabId);
       if (!tab) {
         throw new ExtensionError(
           `Tab not found: ${tabId}`,
@@ -199,9 +201,9 @@ export const safeTabs = {
     }
   },
 
-  async query(queryInfo: browser.tabs.QueryInfo): Promise<browser.tabs.Tab[]> {
+  async query(queryInfo: webext.Tabs.QueryQueryInfoType): Promise<webext.Tabs.Tab[]> {
     try {
-      return await browser.tabs.query(queryInfo);
+      return await webext.tabs.query(queryInfo);
     } catch (error) {
       throw new ExtensionError(
         'Failed to query tabs',
@@ -211,7 +213,7 @@ export const safeTabs = {
     }
   },
 
-  async update(tabId: number, updateProperties: browser.tabs.UpdateUpdatePropertiesType): Promise<browser.tabs.Tab> {
+  async update(tabId: number, updateProperties: webext.Tabs.UpdateUpdatePropertiesType): Promise<webext.Tabs.Tab> {
     if (!isValidTabId(tabId)) {
       throw new ExtensionError(
         `Invalid tab ID: ${tabId}`,
@@ -220,7 +222,7 @@ export const safeTabs = {
     }
 
     try {
-      return await browser.tabs.update(tabId, updateProperties);
+      return await webext.tabs.update(tabId, updateProperties);
     } catch (error) {
       throw new ExtensionError(
         `Failed to update tab: ${tabId}`,

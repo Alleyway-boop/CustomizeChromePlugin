@@ -2,6 +2,7 @@
  * 性能优化工具模块
  */
 
+import browser from 'webextension-polyfill';
 import { safeAsync } from './error-handler';
 
 /**
@@ -11,7 +12,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: number | null = null;
+  let timeout: ReturnType<typeof setTimeout> | null = null;
 
   return (...args: Parameters<T>) => {
     if (timeout) {
@@ -48,7 +49,7 @@ export function throttle<T extends (...args: unknown[]) => unknown>(
 export class MemoryMonitor {
   private static instance: MemoryMonitor;
   private callbacks: ((usage: any) => void)[] = [];
-  private intervalId?: number;
+  private intervalId?: ReturnType<typeof setInterval>;
 
   static getInstance(): MemoryMonitor {
     if (!MemoryMonitor.instance) {
@@ -162,7 +163,7 @@ export class SmartScheduler {
     lastRun: number;
     enabled: boolean;
   }> = new Map();
-  private intervalId?: number;
+  private intervalId?: ReturnType<typeof setInterval>;
 
   addTask(
     id: string, 
@@ -226,7 +227,7 @@ export class SmartScheduler {
  */
 export class CacheManager<T> {
   private cache: Map<string, { data: T; timestamp: number; ttl: number }> = new Map();
-  private cleanupInterval?: number;
+  private cleanupInterval?: ReturnType<typeof setInterval>;
 
   constructor(private defaultTTL: number = 300000) { // 5分钟默认TTL
 

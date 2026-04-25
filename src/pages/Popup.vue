@@ -305,7 +305,7 @@ import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NScrollbar } from 'nai
 import { onMounted, onUnmounted, ref, computed } from 'vue';
 import browser from 'webextension-polyfill';
 import type { TabStatus, FreezeTabStatus, Message, Response, SendResponse } from '../utils';
-import type { ExtendedTabStatus, RestoreAllResult } from '../types';
+import type { RestoreAllResult } from '../types';
 
 // 扩展 TabStatus 接口包含剩余时间
 interface ExtendedTabStatus extends TabStatus {
@@ -318,7 +318,7 @@ const TabStatusList = ref<ExtendedTabStatus[]>([]);
 const freezeTabStatusList = ref<FreezeTabStatus[]>([]);
 const searchQuery = ref('');
 const whitelistSuggestions = ref<string[]>([]);
-let updateTimer: number | null = null;
+let updateTimer: ReturnType<typeof setInterval> | null = null;
 let lastTabStatusHash: string = ''; // 用于检测状态变化
 let updateInterval = 3000; // 默认更新间隔
 let noChangeCount = 0; // 连续无变化次数计数器
@@ -375,9 +375,10 @@ function calculateTabStatusHash(tabList: ExtendedTabStatus[]): string {
 
 // 智能更新标签页时间信息
 function updateTabTimes() {
-  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: Response) => {
-    if (response && response.response) {
-      const newTabList = response.response as ExtendedTabStatus[];
+  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: unknown) => {
+    const resp = response as Response;
+    if (resp && resp.response) {
+      const newTabList = resp.response as ExtendedTabStatus[];
       const currentHash = calculateTabStatusHash(newTabList);
 
       // 检测状态是否发生变化
@@ -489,11 +490,13 @@ function getFreezeTimeout() {
 }
 
 const GetAllTabStatusList = () => {
-  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: Response) => {
-    TabStatusList.value = response.response as ExtendedTabStatus[];
+  browser.runtime.sendMessage({ GetTabStatusList: true }).then((response: unknown) => {
+    const resp = response as Response;
+    TabStatusList.value = resp.response as ExtendedTabStatus[];
   });
-  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: Response) => {
-    freezeTabStatusList.value = response.response as FreezeTabStatus[];
+  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: unknown) => {
+    const resp = response as Response;
+    freezeTabStatusList.value = resp.response as FreezeTabStatus[];
   });
 };
 
@@ -502,8 +505,8 @@ const GotoTab = (tabId: number) => {
 };
 
 const GetFreezeTabList = () => {
-  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: Response) => {
-    freezeTabStatusList.value = response.response as FreezeTabStatus[];
+  browser.runtime.sendMessage({ GetFreezeTabList: true }).then((response: unknown) => {
+    freezeTabStatusList.value = (response as Response).response as FreezeTabStatus[];
   });
 };
 
@@ -572,9 +575,10 @@ const restoreAllFrozenTabs = async () => {
 
 // Get whitelist suggestions for smart whitelist feature
 function getWhitelistSuggestions() {
-  browser.runtime.sendMessage({ GetWhitelistSuggestions: true }).then((response: Response) => {
-    if (response && response.response && Array.isArray(response.response)) {
-      whitelistSuggestions.value = response.response;
+  browser.runtime.sendMessage({ GetWhitelistSuggestions: true }).then((response: unknown) => {
+    const resp = response as Response;
+    if (resp && resp.response && Array.isArray(resp.response) && resp.response.every(item => typeof item === 'string')) {
+      whitelistSuggestions.value = resp.response as string[];
     }
   }).catch((error) => {
     console.error('Error getting whitelist suggestions:', error);
@@ -583,7 +587,7 @@ function getWhitelistSuggestions() {
 
 // Add domain to whitelist from suggestion
 function addToWhitelistSuggestion(domain: string) {
-  browser.runtime.sendMessage({ AddToWhitelist: domain }).then((response: Response) => {
+  browser.runtime.sendMessage({ AddToWhitelist: domain }).then((response: unknown) => {
     if (response && (response as any).success) {
       // Remove from suggestions
       whitelistSuggestions.value = whitelistSuggestions.value.filter(d => d !== domain);
@@ -597,7 +601,7 @@ function addToWhitelistSuggestion(domain: string) {
 
 // Dismiss a whitelist suggestion
 function dismissSuggestion(domain: string) {
-  browser.runtime.sendMessage({ DismissWhitelistSuggestion: domain }).then((response: Response) => {
+  browser.runtime.sendMessage({ DismissWhitelistSuggestion: domain }).then((response: unknown) => {
     whitelistSuggestions.value = whitelistSuggestions.value.filter(d => d !== domain);
   }).catch((error) => {
     console.error('Error dismissing suggestion:', error);

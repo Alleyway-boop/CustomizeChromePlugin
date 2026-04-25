@@ -62,9 +62,10 @@ onMounted(() => {
     console.log("Icon:", icon.value);
 
     // 监听来自背景脚本的消息
-    browser.runtime.onMessage.addListener((message: { type?: string; snapshot?: string }) => {
-        if (message.type === "setSnapshot") {
-            snapshot.value = message.snapshot;
+    browser.runtime.onMessage.addListener((message: unknown) => {
+        const msg = message as { type?: string; snapshot?: string };
+        if (msg.type === "setSnapshot" && msg.snapshot) {
+            snapshot.value = msg.snapshot;
         }
     });
     browser.storage.local.get("backgroundImage").then((result: { backgroundImage?: string }) => {

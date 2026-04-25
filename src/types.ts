@@ -74,7 +74,22 @@ export interface RestoreAllResult {
   restoredCount: number;
 }
 
-export type ResponseData = string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | PageInfoResponse | RestoreAllResult | number[];
+// Generic success/failure response types
+export interface OperationSuccess {
+  success: true;
+}
+
+export interface OperationFailure {
+  success: false;
+  message: string;
+}
+
+export interface DebugStatusResponse {
+  success: true;
+  debugEnabled: boolean;
+}
+
+export type ResponseData = string | string[] | TabStatus[] | FreezeTabStatus[] | boolean | number | undefined | PageInfoResponse | RestoreAllResult | number[] | OperationSuccess | OperationFailure | DebugStatusResponse;
 
 export interface Response {
   response: ResponseData;

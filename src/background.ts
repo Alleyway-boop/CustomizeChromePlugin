@@ -49,13 +49,13 @@ let unfreezeCountMap: Map<string, number> = new Map();
 async function updateBadge() {
   const count = freezeTabStatusMap.size;
   try {
-    if (chrome.action && chrome.action.setBadgeText) {
+    if (browser.action && browser.action.setBadgeText) {
       if (count === 0) {
-        await chrome.action.setBadgeText({ text: BADGE_ZERO_TEXT });
+        await browser.action.setBadgeText({ text: BADGE_ZERO_TEXT });
       } else {
-        await chrome.action.setBadgeText({ text: String(count) });
+        await browser.action.setBadgeText({ text: String(count) });
       }
-      await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
+      await browser.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
       debugLog('Badge updated:', count === 0 ? BADGE_ZERO_TEXT : count);
     }
   } catch (error) {
@@ -121,10 +121,11 @@ browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist', STORAGE_
 });
 
 // Load unfreeze counts from storage for smart whitelist suggestions
-browser.storage.sync.get(STORAGE_KEY_UNFREEZE_COUNTS).then((res: { [key: string]: number }) => {
-  if (res[STORAGE_KEY_UNFREEZE_COUNTS]) {
+browser.storage.sync.get(STORAGE_KEY_UNFREEZE_COUNTS).then((res: Record<string, unknown>) => {
+  const unfreezeData = res[STORAGE_KEY_UNFREEZE_COUNTS];
+  if (unfreezeData && typeof unfreezeData === 'string') {
     try {
-      const counts = JSON.parse(res[STORAGE_KEY_UNFREEZE_COUNTS]);
+      const counts = JSON.parse(unfreezeData);
       unfreezeCountMap = new Map(Object.entries(counts));
       debugLog('Loaded unfreeze counts:', unfreezeCountMap);
     } catch (e) {
@@ -315,12 +316,12 @@ browser.windows.onFocusChanged.addListener(async (windowId) => {
     if (tabs.length > 0 && tabs[0].id) {
       const tab = tabs[0];
       // Use Map for O(1) lookup
-      const tabStatus = tabStatusMap.get(tab.id);
+      const tabStatus = tabStatusMap.get(tab.id!);
       if (tabStatus) {
         const oldTime = tabStatus.lastUseTime;
         tabStatus.lastUseTime = Date.now();
         // Update Map
-        tabStatusMap.set(tab.id, tabStatus);
+        tabStatusMap.set(tab.id!, tabStatus);
         // Sync to array
         const index = tabStatusList.findIndex(t => t.tabId === tab.id);
         if (index !== -1) {
@@ -661,14 +662,14 @@ const FREEZE_CHECK_PERIOD_MINUTES = 1;
 
 function setupFreezeCheckAlarm() {
   // Create alarm to check and freeze tabs periodically
-  chrome.alarms.create(FREEZE_CHECK_ALARM_NAME, {
+  browser.alarms.create(FREEZE_CHECK_ALARM_NAME, {
     delayInMinutes: FREEZE_CHECK_PERIOD_MINUTES,
     periodInMinutes: FREEZE_CHECK_PERIOD_MINUTES
   });
 }
 
 // Listen for the alarm to trigger freeze check
-chrome.alarms.onAlarm.addListener((alarm) => {
+browser.alarms.onAlarm.addListener((alarm: { name: string }) => {
   if (alarm.name === FREEZE_CHECK_ALARM_NAME) {
     console.log('Freeze check alarm triggered');
     checkAndFreezeTabs().catch(error => {
@@ -682,13 +683,13 @@ const CLEANUP_ALARM_NAME = 'cleanupAlarm';
 const CLEANUP_PERIOD_MINUTES = 60;
 
 function setupCleanupAlarm() {
-  chrome.alarms.create(CLEANUP_ALARM_NAME, {
+  browser.alarms.create(CLEANUP_ALARM_NAME, {
     delayInMinutes: CLEANUP_PERIOD_MINUTES,
     periodInMinutes: CLEANUP_PERIOD_MINUTES
   });
 }
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+browser.alarms.onAlarm.addListener((alarm: { name: string }) => {
   if (alarm.name === CLEANUP_ALARM_NAME) {
     console.log('Cleanup alarm triggered');
     cleanupFrozenTabs();
@@ -947,10 +948,10 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
 
   if (request.AddToWhitelist) {
     addToWhitelist(request.AddToWhitelist).then(result => {
-      sendResponse({ response: result });
+      sendResponse({ response: result as { success: true; message: string } });
     }).catch(error => {
       console.error('Error adding to whitelist:', error);
-      sendResponse({ response: { success: false, message: 'Failed to add domain to whitelist' } });
+      sendResponse({ response: { success: false, message: 'Failed to add domain to whitelist' } as { success: false; message: string } });
     });
     return true; // 异步响应
   }
@@ -958,9 +959,10 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
   // Set debug mode
   if (request.SetDebugMode !== undefined) {
     DEBUG_MODE = request.SetDebugMode;
-    await safeStorage.set({ [STORAGE_KEY_DEBUG_ENABLED]: DEBUG_MODE });
-    debugLog('Debug mode set to:', DEBUG_MODE);
-    sendResponse({ response: { success: true, debugEnabled: DEBUG_MODE } });
+    safeStorage.set({ [STORAGE_KEY_DEBUG_ENABLED]: DEBUG_MODE }).then(() => {
+      debugLog('Debug mode set to:', DEBUG_MODE);
+      sendResponse({ response: { success: true, debugEnabled: DEBUG_MODE } });
+    });
     return true;
   }
 
@@ -988,18 +990,19 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     const domain = request.DismissWhitelistSuggestion;
     unfreezeCountMap.delete(domain);
     const countsObj = Object.fromEntries(unfreezeCountMap);
-    await safeStorage.set({ [STORAGE_KEY_UNFREEZE_COUNTS]: JSON.stringify(countsObj) });
-    debugLog('Dismissed whitelist suggestion for:', domain);
-    sendResponse({ response: { success: true } });
+    safeStorage.set({ [STORAGE_KEY_UNFREEZE_COUNTS]: JSON.stringify(countsObj) }).then(() => {
+      debugLog('Dismissed whitelist suggestion for:', domain);
+      sendResponse({ response: { success: true } });
+    });
     return true;
   }
 
   if (request.RemoveFromWhitelist) {
     removeFromWhitelist(request.RemoveFromWhitelist).then(result => {
-      sendResponse({ response: result });
+      sendResponse({ response: result as { success: true; message: string } });
     }).catch(error => {
       console.error('Error removing from whitelist:', error);
-      sendResponse({ response: { success: false, message: 'Failed to remove domain from whitelist' } });
+      sendResponse({ response: { success: false, message: 'Failed to remove domain from whitelist' } as { success: false; message: string } });
     });
     return true; // 异步响应
   }
@@ -1011,13 +1014,13 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
   // 处理页面可见性变化
   if (request.SetPageVisible) {
     // Use Map for O(1) lookup
-    const tabStatus = tabStatusMap.get(sender.tab!.id);
+    const tabStatus = tabStatusMap.get(sender.tab!.id!);
     if (tabStatus) {
       tabStatus.isVisible = true;
       tabStatus.visibilityState = 'visible';
       tabStatus.lastUseTime = Date.now(); // 页面可见时更新使用时间
       // Update Map
-      tabStatusMap.set(sender.tab!.id, tabStatus);
+      tabStatusMap.set(sender.tab!.id!, tabStatus);
       // Sync to array
       const index = tabStatusList.findIndex(t => t.tabId === sender.tab!.id);
       if (index !== -1) {
@@ -1029,12 +1032,12 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
 
   if (request.SetPageHidden) {
     // Use Map for O(1) lookup
-    const tabStatus = tabStatusMap.get(sender.tab!.id);
+    const tabStatus = tabStatusMap.get(sender.tab!.id!);
     if (tabStatus) {
       tabStatus.isVisible = false;
       tabStatus.visibilityState = 'hidden';
       // Update Map
-      tabStatusMap.set(sender.tab!.id, tabStatus);
+      tabStatusMap.set(sender.tab!.id!, tabStatus);
       // Sync to array
       const index = tabStatusList.findIndex(t => t.tabId === sender.tab!.id);
       if (index !== -1) {
