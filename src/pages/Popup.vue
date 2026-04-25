@@ -1,5 +1,6 @@
 <template>
-  <div class="flex flex-col gap-4 w-[380px] p-4 bg-gradient-to-br from-slate-50 to-blue-50/30 min-h-[500px]">
+  <div
+    class="flex flex-col gap-4 w-[380px] max-w-[380px] overflow-hidden p-4 bg-gradient-to-br from-slate-50 to-blue-50/30 min-h-[500px]">
     <!-- 头部标题 -->
     <div
       class="flex justify-between items-center p-3 bg-white/70 backdrop-blur-sm rounded-xl shadow-sm border border-white/20">
@@ -11,41 +12,20 @@
         <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">Tab
           Manager</h1>
       </div>
-      <!-- 搜索框 -->
-      <div class="relative">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="搜索..."
-          class="w-24 px-3 py-1 pl-8 text-sm bg-white/80 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all"
-          @keydown.escape="clearSearch"
-        />
-        <div class="absolute left-2.5 top-1/2 -translate-y-1/2 i-carbon-search text-gray-400 text-sm"></div>
-        <button
-          v-if="searchQuery"
-          @click="clearSearch"
-          class="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-gray-300 hover:bg-gray-400 flex items-center justify-center"
-        >
-          <div class="i-carbon-close text-white text-[10px]"></div>
-        </button>
-      </div>
       <div class="flex items-center gap-2 px-2 py-1 bg-amber-100/80 rounded-full">
         <div class="i-carbon-warning-alt text-amber-600 text-sm animate-pulse"></div>
         <span class="text-xs font-medium text-amber-700">Auto Freeze</span>
       </div>
     </div>
 
-    <!-- 搜索框 -->
+    <!-- Search Bar -->
     <div class="px-1">
-      <div class="relative">
-        <div class="i-carbon-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></div>
-        <input v-model="searchQuery" type="text" placeholder="Search tabs by title or URL..."
-          class="w-full pl-9 pr-4 py-2 bg-white/70 backdrop-blur-sm rounded-lg border border-gray-200/50 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-300 transition-all" />
-        <button v-if="searchQuery" @click="searchQuery = ''"
-          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-          <div class="i-carbon-close text-sm"></div>
-        </button>
-      </div>
+      <NInput v-model="searchQuery" placeholder="Search tabs by title or URL..." clearable size="medium"
+        @keydown.escape="clearSearch" class="w-full pl-3 py-1 bg-white/80 backdrop-blur-md rounded-xl border border-gray-200/60 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 focus:bg-white transition-all ">
+        <template #prefix>
+          <div class="i-carbon-search text-indigo-400"></div>
+        </template>
+      </NInput>
     </div>
 
     <!-- 智能白名单建议 -->
@@ -107,12 +87,14 @@
           <template #header-extra>
             <div class="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full">
               <div class="i-carbon-fire text-white text-sm animate-pulse"></div>
-              <span class="text-xs font-bold text-white">{{ searchQuery ? filteredTabStatusList.length + '/' : '' }}{{ TabStatusList.length }}</span>
+              <span class="text-xs font-bold text-white">{{ searchQuery ? filteredTabStatusList.length + '/' : '' }}{{
+                TabStatusList.length }}</span>
             </div>
           </template>
 
           <div class="flex flex-col gap-2 p-3">
-            <div v-if="searchQuery && filteredTabStatusList.length === 0" class="flex flex-col items-center justify-center py-6 text-center">
+            <div v-if="searchQuery && filteredTabStatusList.length === 0"
+              class="flex flex-col items-center justify-center py-6 text-center">
               <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-2">
                 <div class="i-carbon-search text-gray-400 text-xl"></div>
               </div>
@@ -246,13 +228,15 @@
               <!-- 冻结计数 -->
               <div class="flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-blue-400 to-cyan-500 rounded-full">
                 <div class="i-carbon-snowflake text-white text-sm"></div>
-                <span class="text-xs font-bold text-white">{{ searchQuery ? filteredFreezeTabStatusList.length + '/' : '' }}{{ freezeTabStatusList.length }}</span>
+                <span class="text-xs font-bold text-white">{{ searchQuery ? filteredFreezeTabStatusList.length + '/' :
+                  '' }}{{ freezeTabStatusList.length }}</span>
               </div>
             </div>
           </template>
 
           <div class="flex flex-col gap-2 p-3">
-            <div v-if="searchQuery && filteredFreezeTabStatusList.length === 0" class="flex flex-col items-center justify-center py-6 text-center">
+            <div v-if="searchQuery && filteredFreezeTabStatusList.length === 0"
+              class="flex flex-col items-center justify-center py-6 text-center">
               <div class="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mb-2">
                 <div class="i-carbon-search text-gray-400 text-xl"></div>
               </div>
@@ -327,7 +311,7 @@
 </template>
 
 <script lang="ts" setup>
-import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NScrollbar } from 'naive-ui';
+import { NCollapse, NCollapseItem, NInputNumber, NSwitch, NScrollbar, NInput } from 'naive-ui';
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue';
 import browser from 'webextension-polyfill';
 import type { TabStatus, FreezeTabStatus, Message, Response, SendResponse } from '../utils';
@@ -718,6 +702,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+body {
+  margin: 0;
+  width: fit-content;
+}
+
 /* 现代动画效果 */
 @keyframes pulse {
 
