@@ -54,6 +54,12 @@ export interface Message {
   SetPageVisible?: boolean;
   SetPageHidden?: boolean;
   GetVisibleTabs?: boolean;
+  // Debug mode
+  SetDebugMode?: boolean;
+  GetDebugMode?: boolean;
+  // Smart whitelist suggestions
+  GetWhitelistSuggestions?: boolean;
+  DismissWhitelistSuggestion?: string;
 }
 
 // Response types

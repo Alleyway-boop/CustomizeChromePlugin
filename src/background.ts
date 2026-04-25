@@ -4,6 +4,27 @@ import { Message, SendResponse, TabStatus, FreezeTabStatus } from './types';
 import { safeAsync, safeStorage, safeTabs, ExtensionError, ErrorCodes, isValidDomain, normalizeDomain } from './utils/error-handler';
 import { SmartScheduler } from './utils/performance';
 import { configManager } from './utils/config';
+import {
+  DEFAULT_FREEZE_TIMEOUT_MINUTES,
+  BADGE_ZERO_TEXT,
+  BADGE_COLOR,
+  BADGE_TEXT_COLOR,
+  STORAGE_KEY_DEBUG_ENABLED,
+  STORAGE_KEY_FREEZE_TIMEOUT,
+  STORAGE_KEY_FREEZE_PINNED,
+  STORAGE_KEY_WHITELIST,
+  STORAGE_KEY_FREEZE_TAB_LIST,
+  STORAGE_KEY_UNFREEZE_COUNTS,
+  UNFREEZE_COUNT_THRESHOLD,
+} from './constants';
+
+// Debug mode state
+let DEBUG_MODE = false;
+function debugLog(...args: unknown[]) {
+  if (DEBUG_MODE) {
+    console.log('[DEBUG]', ...args);
+  }
+}
 
 // 配置和状态
 let whitelist: string[] = [];
@@ -20,6 +41,27 @@ let freezeTabStatusList: FreezeTabStatus[] = [];
 
 // Debounce freeze operations to prevent double-freeze
 const freezingInProgress: Set<number> = new Set();
+
+// Unfreeze count tracking for smart whitelist suggestions
+let unfreezeCountMap: Map<string, number> = new Map();
+
+// Badge update function - shows frozen tab count on extension icon
+async function updateBadge() {
+  const count = freezeTabStatusMap.size;
+  try {
+    if (chrome.action && chrome.action.setBadgeText) {
+      if (count === 0) {
+        await chrome.action.setBadgeText({ text: BADGE_ZERO_TEXT });
+      } else {
+        await chrome.action.setBadgeText({ text: String(count) });
+      }
+      await chrome.action.setBadgeBackgroundColor({ color: BADGE_COLOR });
+      debugLog('Badge updated:', count === 0 ? BADGE_ZERO_TEXT : count);
+    }
+  } catch (error) {
+    console.warn('Failed to update badge:', error);
+  }
+}
 
 // 白名单数据验证和清理
 async function validateAndCleanWhitelist(inputWhitelist: unknown): Promise<string[]> {
@@ -49,9 +91,10 @@ async function validateAndCleanWhitelist(inputWhitelist: unknown): Promise<strin
 }
 
 // 初始化
-browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then(async (res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[] }) => {
+browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist', STORAGE_KEY_DEBUG_ENABLED]).then(async (res: { FreezeTimeout?: number; FreezePinned?: boolean; whitelist?: string[]; debugEnabled?: boolean }) => {
   if (res.FreezeTimeout) FreezeTimeout = res.FreezeTimeout;
   if (res.FreezePinned !== undefined) FreezePinned.value = res.FreezePinned;
+  if (res.debugEnabled !== undefined) DEBUG_MODE = res.debugEnabled;
 
   // 验证和清理白名单数据
   if (res.whitelist) {
@@ -60,7 +103,7 @@ browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then(as
 
     // 如果清理过程中移除了无效数据，保存清理后的结果
     if (cleanedWhitelist.length !== res.whitelist.length) {
-      console.log('Cleaned whitelist data during initialization:', {
+      debugLog('Cleaned whitelist data during initialization:', {
         original: res.whitelist.length,
         cleaned: cleanedWhitelist.length,
         removed: res.whitelist.length - cleanedWhitelist.length
@@ -71,7 +114,23 @@ browser.storage.sync.get(['FreezeTimeout', 'FreezePinned', 'whitelist']).then(as
     whitelist = [];
   }
 
-  console.log('Initial config:', { FreezeTimeout, FreezePinned, whitelist });
+  debugLog('Initial config:', { FreezeTimeout, FreezePinned, whitelist, debugEnabled: DEBUG_MODE });
+  
+  // Update badge on startup
+  await updateBadge();
+});
+
+// Load unfreeze counts from storage for smart whitelist suggestions
+browser.storage.sync.get(STORAGE_KEY_UNFREEZE_COUNTS).then((res: { [key: string]: number }) => {
+  if (res[STORAGE_KEY_UNFREEZE_COUNTS]) {
+    try {
+      const counts = JSON.parse(res[STORAGE_KEY_UNFREEZE_COUNTS]);
+      unfreezeCountMap = new Map(Object.entries(counts));
+      debugLog('Loaded unfreeze counts:', unfreezeCountMap);
+    } catch (e) {
+      debugLog('Failed to parse unfreeze counts:', e);
+    }
+  }
 });
 
 // 监听存储变化
@@ -352,6 +411,7 @@ async function FreezeTab(tabId: number) {
     });
 
     saveFreeTab();
+    updateBadge(); // Update badge after freezing
   } catch (error) {
     console.error('Error freezing tab:', error);
   } finally {
@@ -411,6 +471,23 @@ async function restoreAllFrozenTabs(): Promise<{ success: boolean; message: stri
 
     // 保存更新后的冻结列表
     await saveFreeTab();
+    await updateBadge(); // Update badge after restoring
+
+    // Track unfreeze counts for smart whitelist suggestions
+    for (const frozenTab of tabsToRestore) {
+      try {
+        const url = new URL(frozenTab.url);
+        const domain = url.hostname;
+        const currentCount = unfreezeCountMap.get(domain) || 0;
+        unfreezeCountMap.set(domain, currentCount + 1);
+      } catch (e) {
+        // Invalid URL, skip
+      }
+    }
+    // Persist unfreeze counts
+    const countsObj = Object.fromEntries(unfreezeCountMap);
+    await safeStorage.set({ [STORAGE_KEY_UNFREEZE_COUNTS]: JSON.stringify(countsObj) });
+    debugLog('Updated unfreeze counts:', unfreezeCountMap);
 
     const message = restoredCount > 0
       ? `Successfully restored ${restoredCount} frozen tabs`
@@ -788,8 +865,28 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
     sendResponse({ response: freezeTabStatusList });
   }
   if (request.RemoveFreezeTab) {
+    // Find the tab being removed to track the domain
+    const removedTab = freezeTabStatusList.find((tab) => tab.tabId === request.RemoveFreezeTab);
     freezeTabStatusList = freezeTabStatusList.filter((tab) => tab.tabId !== request.RemoveFreezeTab);
+    freezeTabStatusMap.delete(request.RemoveFreezeTab as number);
     saveFreeTab();
+    updateBadge(); // Update badge after removing frozen tab
+    
+    // Track unfreeze for smart whitelist suggestion
+    if (removedTab) {
+      try {
+        const url = new URL(removedTab.url);
+        const domain = url.hostname;
+        const currentCount = unfreezeCountMap.get(domain) || 0;
+        unfreezeCountMap.set(domain, currentCount + 1);
+        const countsObj = Object.fromEntries(unfreezeCountMap);
+        safeStorage.set({ [STORAGE_KEY_UNFREEZE_COUNTS]: JSON.stringify(countsObj) });
+        debugLog('Updated unfreeze count for', domain, ':', currentCount + 1);
+      } catch (e) {
+        // Invalid URL, skip
+      }
+    }
+    
     sendResponse({ response: 'Tab removed from freeze list' });
   }
 
@@ -822,6 +919,45 @@ browser.runtime.onMessage.addListener((req: unknown, sender, sendResponse: SendR
       sendResponse({ response: { success: false, message: 'Failed to add domain to whitelist' } });
     });
     return true; // 异步响应
+  }
+
+  // Set debug mode
+  if (request.SetDebugMode !== undefined) {
+    DEBUG_MODE = request.SetDebugMode;
+    await safeStorage.set({ [STORAGE_KEY_DEBUG_ENABLED]: DEBUG_MODE });
+    debugLog('Debug mode set to:', DEBUG_MODE);
+    sendResponse({ response: { success: true, debugEnabled: DEBUG_MODE } });
+    return true;
+  }
+
+  // Get debug mode status
+  if (request.GetDebugMode) {
+    sendResponse({ response: DEBUG_MODE });
+    return true;
+  }
+
+  // Get smart whitelist suggestions (domains unfrozen 3+ times)
+  if (request.GetWhitelistSuggestions) {
+    const suggestions: string[] = [];
+    unfreezeCountMap.forEach((count, domain) => {
+      if (count >= UNFREEZE_COUNT_THRESHOLD && !whitelist.includes(domain)) {
+        suggestions.push(domain);
+      }
+    });
+    debugLog('Whitelist suggestions:', suggestions);
+    sendResponse({ response: suggestions });
+    return true;
+  }
+
+  // Dismiss whitelist suggestion for a domain
+  if (request.DismissWhitelistSuggestion) {
+    const domain = request.DismissWhitelistSuggestion;
+    unfreezeCountMap.delete(domain);
+    const countsObj = Object.fromEntries(unfreezeCountMap);
+    await safeStorage.set({ [STORAGE_KEY_UNFREEZE_COUNTS]: JSON.stringify(countsObj) });
+    debugLog('Dismissed whitelist suggestion for:', domain);
+    sendResponse({ response: { success: true } });
+    return true;
   }
 
   if (request.RemoveFromWhitelist) {
@@ -930,6 +1066,29 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
         });
       }
       break;
+  }
+});
+
+// Keyboard shortcut command listeners
+browser.commands?.onCommand?.addListener(async (command) => {
+  debugLog('Keyboard command received:', command);
+  if (command === 'freeze-tab') {
+    try {
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      if (tabs.length > 0 && tabs[0].id) {
+        await FreezeTab(tabs[0].id);
+        debugLog('Freeze tab command executed for tab:', tabs[0].id);
+      }
+    } catch (error) {
+      console.error('Error executing freeze-tab command:', error);
+    }
+  } else if (command === 'unfreeze-all') {
+    try {
+      const result = await restoreAllFrozenTabs();
+      debugLog('Unfreeze all command executed:', result);
+    } catch (error) {
+      console.error('Error executing unfreeze-all command:', error);
+    }
   }
 });
 
